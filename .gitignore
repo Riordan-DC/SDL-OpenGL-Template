@@ -53,3 +53,6 @@ dkms.conf
 
 # Build folder
 build/
+
+# Macos funny
+.DS_Store
