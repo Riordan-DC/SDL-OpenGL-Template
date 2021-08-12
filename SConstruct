@@ -71,7 +71,8 @@ if system == 'Windows':
         'user32',
         'uuid',
         'winspool',
-        'vcruntime'
+        'vcruntime',
+        'msvcrtd'
     ]
 
 	INCLUDE += [
@@ -116,7 +117,7 @@ if system == 'Windows':
 		'/std:c++17',
 		#'/RTC1',
 		'/Od',
-		'/sdl',
+		#'/sdl',
 		'/MDd',
 		'/GS-'
 		#'/MTd' # WARNING: d at the end means debug version

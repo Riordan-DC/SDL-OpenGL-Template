@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define SDL_MAIN_HANDLED
-
 // SDL2
 #include <SDL2/SDL.h>
 //#include <SDL/SDL_opengl.h>
@@ -103,12 +101,10 @@ SDL_GLContext* new_SDL_GLContext(SDL_Window* window, int context_width, int cont
 
 
 int main(int argc, char* argv[]) {
-
-	int* x = (int*)malloc(sizeof(int));
-	char** test = (char**)malloc((size_t)10 * sizeof(char*));
-
 	window = new_SDL_Window(500, 500, "SDL-OpenGL-Project");
 	context = new_SDL_GLContext(window, 500, 500, 4, 1, 4, 1);
+
+	glEnable(GL_DEPTH_TEST);
 
 	SDL_Event event;
 	bool quit = false;
@@ -119,22 +115,14 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		//glEnable(GL_DEPTH_TEST);
-		//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		//glClearColor(0,0,0,1);
-
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClearColor(0,0,1,1);
 
 		SDL_GL_SwapWindow(window);
 	}
 
-	//SDL_GL_DeleteContext(context);
+	SDL_GL_DeleteContext(context);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
     return 0;
 }
-
-/*
-int main(int argc, char* argv[]) {
-	printf("Hello world");
-	return 0;
-}*/
