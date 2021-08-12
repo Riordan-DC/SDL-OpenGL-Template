@@ -52,13 +52,12 @@ def build_commandline(commands, num_jobs):
     result = " ^& ".join(common_build_prefix + [" ".join([commands] + common_build_postfix)])
     return result
 
-if system == 'Windows':
+if env['PLATFORM'] == 'win32':
 	print('Windows Build')
 	
 	LIBS += [
 		'opengl32',
 		'kernel32',
-		#'libucrt', # static universal c runtime
 		'ucrtd', # d suffix is debug
 		'advapi32',
         'comdlg32',
@@ -72,7 +71,7 @@ if system == 'Windows':
         'uuid',
         'winspool',
         'vcruntime',
-        'msvcrtd'
+        'msvcrtd' # d suffix is debug
     ]
 
 	INCLUDE += [
@@ -97,13 +96,6 @@ if system == 'Windows':
 		'/NODEFAULTLIB',
 	]
 
-#/OUT:"C:\Users\Riordan\Documents\Project1\Debug\Project1.exe" 
-#/MANIFEST /NXCOMPAT /PDB:"C:\Users\Riordan\Documents\Project1\Debug\Project1.pdb" 
-#/DYNAMICBASE "kernel32.lib" "user32.lib" "gdi32.lib" "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib" "odbc32.lib" "odbccp32.lib" 
-#/DEBUG /MACHINE:X86 /INCREMENTAL /PGD:"C:\Users\Riordan\Documents\Project1\Debug\Project1.pgd" 
-#/SUBSYSTEM:CONSOLE /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /ManifestFile:"Debug\Project1.exe.intermediate.manifest" 
-#/LTCGOUT:"Debug\Project1.iobj" /ERRORREPORT:PROMPT /ILK:"Debug\Project1.ilk" /NOLOGO /TLBID:1 
-
 	CPPDEFINES = [
 		'_DEBUG',
 		'WIN32',
@@ -119,7 +111,7 @@ if system == 'Windows':
 		'/Od',
 		#'/sdl',
 		'/MDd',
-		'/GS-'
+		'/GS-' # disables /sdl
 		#'/MTd' # WARNING: d at the end means debug version
 	]
 
