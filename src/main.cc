@@ -615,7 +615,7 @@ int main(int argc, char* argv[]) {
                 nk_layout_row_push(&ctx, 50);
                 nk_label(&ctx, "Volume:", NK_TEXT_LEFT);
                 nk_layout_row_push(&ctx, 110);
-                nk_slider_float(&ctx, 0, &value, 1.0f, 0.1f);
+                nk_slider_float(&ctx, 0, &value, 1.0f, 0.01f);
             }
             nk_layout_row_end(&ctx);
         }
