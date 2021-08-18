@@ -6,9 +6,8 @@ vars.Add(EnumVariable('target', 'Building target', 'debug', allowed_values=('deb
 vars.Add(EnumVariable('modules', 'Building all modules', 'yes', allowed_values=('yes', 'no')))
 # cgltf
 vars.Add(EnumVariable('cgltf', 'Building cgltf module', 'yes', allowed_values=('yes', 'no')))
-# imgui
-vars.Add(EnumVariable('imgui', 'Building imgui module', 'yes', allowed_values=('yes', 'no')))
-
+# nuklear
+vars.Add(EnumVariable('nuklear', 'Building nuklear module', 'yes', allowed_values=('yes', 'no')))
 
 env = Environment(variables = vars)
 Help(vars.GenerateHelpText(env))
@@ -125,6 +124,26 @@ if env['PLATFORM'] == 'win32':
 		#'/MTd' # WARNING: d at the end means debug version
 	]
 
+	# Modules
+	if env['modules'] == 'yes':
+		CPPDEFINES += [
+			'__MODULES__'
+		]
+		if env['cgltf'] == 'yes':
+			CPPDEFINES += [
+				'__CGLTF__'
+			]
+			INCLUDE += [
+				'modules/cgltf/'
+			]
+		if env['nuklear'] == 'yes':
+			CPPDEFINES += [
+				'__NUKLEAR__',
+			]
+			INCLUDE += [
+				'modules/nuklear/'
+			]
+
 	env.Append(LINKFLAGS = LINKFLAGS)
 	env.Append(LIBS = LIBS)
 	env.Append(LIBPATH = LIBPATH)
@@ -147,7 +166,7 @@ if env['PLATFORM'] == 'win32':
 	platform = ['|x64', '|x86', '|Win32']
 
 	env.MSVSProject(target = name + env['MSVSPROJECTSUFFIX'],
-	                srcs = ['src/main.c', 'src/glad.c'],
+	                srcs = [str(file) for file in src_files],
 	                #cppdefines=[],
 	                #cppflags=[],
 	                #cpppaths=[],
@@ -201,12 +220,12 @@ elif env['PLATFORM'] == 'posix':
 			INCLUDE += [
 				'modules/cgltf/'
 			]
-		if env['imgui'] == 'yes':
+		if env['nuklear'] == 'yes':
 			CPPDEFINES += [
-				'__IMGUI__'
+				'__NUKLEAR__',
 			]
 			INCLUDE += [
-				'modules/imgui/'
+				'modules/nuklear/'
 			]
 
 	env.Append(LINKFLAGS = LINKFLAGS)
