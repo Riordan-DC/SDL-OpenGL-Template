@@ -2,12 +2,20 @@ import platform
 
 vars = Variables()
 vars.Add(EnumVariable('target', 'Building target', 'debug', allowed_values=('debug', 'profile', 'release')))
+# Modules
+vars.Add(EnumVariable('modules', 'Building all modules', 'yes', allowed_values=('yes', 'no')))
+# cgltf
+vars.Add(EnumVariable('cgltf', 'Building cgltf module', 'yes', allowed_values=('yes', 'no')))
+# imgui
+vars.Add(EnumVariable('imgui', 'Building imgui module', 'yes', allowed_values=('yes', 'no')))
+
+
 env = Environment(variables = vars)
 Help(vars.GenerateHelpText(env))
 
 system = platform.system()
 
-src_files = Glob('src/*.c')
+src_files = Glob('src/*.c') + Glob('src/*.cc')
 INCLUDE = ["include"]
 name = "SDL-OpenGL-Project"
 bin = "build/bin/" + name
@@ -16,6 +24,8 @@ LIBPATH = []
 LINKFLAGS = []
 CCFLAGS = []
 CPPDEFINES = []
+
+print(f"*** {env['PLATFORM']} ***")
 
 cc = env['CC']
 if cc == 'cl':
@@ -147,17 +157,76 @@ if env['PLATFORM'] == 'win32':
 	                #misc = None,
 	                buildtarget = project,
 	                variant = env['target'] + "|Win32")
-else:
-	# Linux only
-	#if env['target'] == 'debug':
-	#    env.Append(CCFLAGS = ['-Wall', '-g', '-O0', '-DDEBUG'])
-	#elif env['target'] == 'release':
-	#    env.Append(CCFLAGS = ['-Wall', '-O3', '-DNDEBUG'])
-	#    env.Append(LINKFLAGS = ['-s'])
-	#elif env['target'] == 'profile':
-	#    env.Append(CCFLAGS = ['-Wall', '-pg', '-O0', '-DNDEBUG'])
+elif env['PLATFORM'] == 'posix':
+	print('POSIX Build')
 
-	project = env.Program(target=bin, source=src_files, CPPPATH=INCLUDE, LIBS=LIBS, LIBPATH=LIBPATH, LINKFLAGS=LINKFLAGS)
+	env['CC'] = env['CXX']
+
+	# Linux only
+	if env['target'] == 'debug':
+	    env.Append(CCFLAGS = ['-Wall', '-g', '-O0', '-DDEBUG'])
+	elif env['target'] == 'release':
+	    env.Append(CCFLAGS = ['-Wall', '-O3', '-DNDEBUG'])
+	    env.Append(LINKFLAGS = ['-s'])
+	elif env['target'] == 'profile':
+	    env.Append(CCFLAGS = ['-Wall', '-pg', '-O0', '-DNDEBUG'])
+
+	# Core for POSIX
+	INCLUDE += [
+		'/usr/include/SDL2/'
+	]
+	
+	LIBPATH += [
+		'/usr/lib/x86_64-linux-gnu/'
+	]
+
+	LIBS += [
+		'dl',
+		'GL'
+	]
+
+	CPPDEFINES += [
+		'__POSIX__'
+	]
+
+	# Modules
+	if env['modules'] == 'yes':
+		CPPDEFINES += [
+			'__MODULES__'
+		]
+		if env['cgltf'] == 'yes':
+			CPPDEFINES += [
+				'__CGLTF__'
+			]
+			INCLUDE += [
+				'modules/cgltf/'
+			]
+		if env['imgui'] == 'yes':
+			CPPDEFINES += [
+				'__IMGUI__'
+			]
+			INCLUDE += [
+				'modules/imgui/'
+			]
+
+	env.Append(LINKFLAGS = LINKFLAGS)
+	env.Append(LIBS = LIBS)
+	env.Append(LIBPATH = LIBPATH)
+	env.Append(CPPPATH = INCLUDE)
+	env.Append(CCFLAGS = CCFLAGS)
+	env.Append(CPPFLAGS = []) # Same as CCFLAGS on windows
+	env.Append(CXXFLAGS = ['-std=c++11'])
+	env.Append(CPPDEFINES = CPPDEFINES)
+
+	project = env.Program(
+		target=bin, 
+		source=src_files, 
+		CPPPATH=INCLUDE, 
+		LIBS=LIBS, 
+		LIBPATH=LIBPATH, 
+		LINKFLAGS=LINKFLAGS)
 
 	#env.Install('/usr/bin', [project])
 	#env.Alias('install', '/usr/bin')
+else:
+	print(f"Platform: {env['PLATFORM']} does not have a supported build script")
