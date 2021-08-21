@@ -432,6 +432,7 @@ elif env['PLATFORM'] == 'posix':
 		if env['bullet'] == 'yes':
 			CPPDEFINES += [
 				'__BULLET__',
+				'BT_USE_OLD_DAMPING_METHOD',
 			]
 			if env['float'] == '64': CPPDEFINES += ['BT_USE_DOUBLE_PRECISION=1']
 			INCLUDE += [
