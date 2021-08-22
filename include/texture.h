@@ -2,6 +2,7 @@
 #define IMAGE_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /* images are texture data in 
 an interchange format such as
@@ -25,7 +26,7 @@ typedef enum {
 
 typedef struct {
 	char* data;
-	uint32_t users = 0;
+	uint32_t users;
 	bool unused;
 } texture_t;
 

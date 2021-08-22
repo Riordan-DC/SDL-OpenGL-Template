@@ -20,17 +20,15 @@ shader_t* shader_new(shader_src_t* vert_src, shader_src_t* frag_src) {
 
 	// Vertex
 	const char* vertex_sources[] = { version, compute_ext, flag_src ? flag_src : "", vert_src->shader_src };
-	int32_t vertex_src_lens[] = { -1, -1, -1, vert_src->shader_src_len};
+	int32_t vertex_src_lens[] = { -1, -1, -1, (int32_t)vert_src->shader_src_len};
 	int vertexSourceCount = sizeof(vertex_sources) / sizeof(vertex_sources[0]);
 	GLuint vertex_shader = gl_compile_shader(GL_VERTEX_SHADER, vertex_sources, vertex_src_lens, vertexSourceCount);
 
 	// Fragment
 	const char* fragment_sources[] = { version, compute_ext, flag_src ? flag_src : "", frag_src->shader_src };
-	int fragment_src_lens[] = { -1, -1, -1, frag_src->shader_src_len};
+	int fragment_src_lens[] = { -1, -1, -1, (int32_t)frag_src->shader_src_len};
 	int fragmentSourceCount = sizeof(fragment_sources) / sizeof(fragment_sources[0]);
 	GLuint fragment_shader = gl_compile_shader(GL_FRAGMENT_SHADER, fragment_sources, fragment_src_lens, fragmentSourceCount);
-
-	shader_free(flag_src);
 
 	// Link
 	uint32_t program = glCreateProgram();
@@ -44,7 +42,7 @@ shader_t* shader_new(shader_src_t* vert_src, shader_src_t* frag_src) {
 	glBindAttribLocation(program, SHADER_BONES, "lovrBones");
 	glBindAttribLocation(program, SHADER_BONE_WEIGHTS, "lovrBoneWeights");
 	glBindAttribLocation(program, SHADER_DRAW_ID, "lovrDrawID");
-	linkProgram(program);
+	//linkProgram(program);
 	glDetachShader(program, vertex_shader);
 	glDeleteShader(vertex_shader);
 	glDetachShader(program, fragment_shader);
@@ -58,12 +56,12 @@ shader_t* shader_new(shader_src_t* vert_src, shader_src_t* frag_src) {
 	glVertexAttribI4uiv(SHADER_BONES, (uint32_t[4]) { 0., 0., 0., 0. });
 	glVertexAttrib4fv(SHADER_BONE_WEIGHTS, (float[4]) { 1., 0., 0., 0. });
 	glVertexAttribI4ui(SHADER_DRAW_ID, 0, 0, 0, 0);
-	lovrShaderSetupUniforms(shader);
+	//lovrShaderSetupUniforms(shader);
 
 	return shader;
 }
 
-shader_t* shader_default(default_shader_t type, const char** flags, uint32_t flags_count) {
+shader_t* shader_default(default_shader_type type, char** flags, uint32_t flags_count) {
 	shader_t* shader = shader_allocate(sizeof(shader_t));
 
 	return shader;
@@ -83,35 +81,35 @@ void shader_delete(shader_t* shader) {
 	shader_free(shader); /* this does not free the uniform references */
 }
 
-shader_src_t* shader_src_new(const char* shader_src, uint32_t shader_src_len, const char** flags, uint32_t flags_count) {
-	shader_src_t* shader_src = shader_allocate(sizeof(shader_src_t));
+shader_src_t* shader_src_new(char* shader_src, uint32_t shader_src_len, char** flags, uint32_t flags_count) {
+	shader_src_t* shader_src_new = shader_allocate(sizeof(shader_src_t));
 
-	shader_src->shader_src = shader_src;
-	shader_src->shader_src_len = shader_src_len;
-	shader_src->flags = flags;
-	shader_src->flags_count = flags_count;
+	shader_src_new->shader_src = shader_src;
+	shader_src_new->shader_src_len = shader_src_len;
+	shader_src_new->flags = flags;
+	shader_src_new->flags_count = flags_count;
 
-	return shader_src;
+	return shader_src_new;
 }
 
 void shader_allocator_set(void* alloc, void* free) {
-	allocator.alloc = alloc;
-	allocator.free = free;
+	shader_allocator.alloc = alloc;
+	shader_allocator.free = free;
 }
 
 static void* shader_allocate(size_t size) {
-	if (allocator.alloc == NULL) {
+	if (shader_allocator.alloc == NULL) {
 		return malloc(size);
 	} else {
-		return allocator.alloc(size);
+		return shader_allocator.alloc(size);
 	}
 }
 
 static void shader_free(void* ref) {
-	if (allocator.free == NULL) {
+	if (shader_allocator.free == NULL) {
 		free(ref);
 	} else {
-		allocator.free(ref);
+		shader_allocator.free(ref);
 	}
 }
 

@@ -35,24 +35,24 @@ GLuint gl_compile_shader(GLenum type, const char** sources, int* lengths, int co
   return shader;
 }
 
-void gl_allocator_set(void* alloc, void* free) {
-	allocator.alloc = alloc;
-	allocator.free = free;
+void gl_allocator_set(void* (*alloc)(size_t size), void (*free)(void* ref)) {
+	gl_allocator.alloc = alloc;
+	gl_allocator.free = free;
 }
 
 static void* gl_allocate(size_t size) {
-	if (allocator.alloc == NULL) {
+	if (gl_allocator.alloc == NULL) {
 		return malloc(size);
 	} else {
-		return allocator.alloc(size);
+		return gl_allocator.alloc(size);
 	}
 }
 
 static void gl_free(void* ref) {
-	if (allocator.free == NULL) {
+	if (gl_allocator.free == NULL) {
 		free(ref);
 	} else {
-		allocator.free(ref);
+		gl_allocator.free(ref);
 	}
 }
 

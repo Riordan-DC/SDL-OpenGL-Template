@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "opengl.h"
 #include "texture.h"
@@ -14,9 +15,9 @@ a shader program on the gpu.*/
 #define MAX_UNIFORMS 8
 
 typedef struct {
-	const char* shader_src;
+	char* shader_src;
 	uint32_t shader_src_len;
-	const char** flags;
+	char** flags;
 	uint32_t flags_count;
 } shader_src_t;
 
@@ -71,17 +72,17 @@ typedef struct {
 } shader_t;
 
 static struct {
-	void* alloc = NULL;
-	void* free = NULL;
-} allocator;
+	void* (*alloc)(size_t size);
+	void (*free)(void* ref);
+} shader_allocator;
 
 
 shader_t* shader_new(shader_src_t* vert_src, shader_src_t* frag_src);
-shader_t* shader_default(default_shader_type type, const char** flags, uint32_t flags_count);
+shader_t* shader_default(default_shader_type type, char** flags, uint32_t flags_count);
 shader_t* shader_compute(shader_src_t* comp_src);
 void shader_set_uniform(shader_t* shader, char* uniform_name, void* data, uint32_t start, uint32_t count, uint32_t size);
 void shader_delete(shader_t* shader);
-shader_src_t* shader_src_new(const char* shader_src, uint32_t shader_src_len, const char** flags, uint32_t flags_count);
+shader_src_t* shader_src_new(char* shader_src, uint32_t shader_src_len, char** flags, uint32_t flags_count);
 
 void shader_allocator_set(void* alloc, void* free);
 static void* shader_allocate(size_t size);
@@ -94,7 +95,7 @@ their uniforms. basic materials
 should be: BPR and Cell*/
 
 struct material_t {
-
+	shader_t* shader;
 };
 
 #endif

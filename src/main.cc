@@ -38,7 +38,7 @@
     #endif
 
 	#ifdef __BULLET__
-		#include "btBulletCollisionCommon.h"
+		//#include "btBulletCollisionCommon.h"
 		#include "btBulletDynamicsCommon.h"
 	#endif
 
@@ -214,6 +214,19 @@ int main(int argc, char* argv[]) {
 
 	glEnable(GL_DEPTH_TEST);
 
+	// Build the broadphase
+	btBroadphaseInterface* broadphase = new btDbvtBroadphase();
+
+	// Set up the collision configuration and dispatcher
+	btDefaultCollisionConfiguration* collisionConfiguration = new btDefaultCollisionConfiguration();
+	btCollisionDispatcher* dispatcher = new btCollisionDispatcher(collisionConfiguration);
+
+	// The actual physics solver
+	btSequentialImpulseConstraintSolver* solver = new btSequentialImpulseConstraintSolver;
+
+	// The world.
+	btDiscreteDynamicsWorld* dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+
 	#if 0
 	// Load model
 	fprintf(stderr, "[-] Loading model: %s\n", argv[1]);
@@ -298,6 +311,12 @@ int main(int argc, char* argv[]) {
             nk_sdl_handle_event(&event);
         }
         nk_input_end(ctx);
+
+		// PHYSICS
+		dynamicsWorld->stepSimulation(
+			0.01,						// Time since last step
+			7,								// Mas substep count
+			btScalar(1.) / btScalar(60.));	// Fixed time step 
 
 		// GUI        
 		struct nk_canvas canvas;

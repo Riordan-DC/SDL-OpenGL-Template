@@ -34,9 +34,9 @@ print(f"*** {env['PLATFORM']} ***")
 
 cc = env['CC']
 if cc == 'cl':
-	pass
+    pass
 elif cc == 'gcc':
-	pass
+    pass
 
 # windows utils
 def find_visual_c_batch_file(env):
@@ -73,10 +73,10 @@ def get_bullet_source():
     thirdparty_dir = "modules/bullet/"
 
     bullet2_src = [
-    	# Bullet3Common
-    	"Bullet3Common/b3AlignedAllocator.cpp",
-    	"Bullet3Common/b3Vector3.cpp",
-    	"Bullet3Common/b3Logging.cpp",
+        # Bullet3Common
+        "Bullet3Common/b3AlignedAllocator.cpp",
+        "Bullet3Common/b3Vector3.cpp",
+        "Bullet3Common/b3Logging.cpp",
         # BulletCollision
         "BulletCollision/BroadphaseCollision/btAxisSweep3.cpp",
         "BulletCollision/BroadphaseCollision/btBroadphaseProxy.cpp",
@@ -263,13 +263,15 @@ def get_bullet_source():
     return thirdparty_sources
 
 if env['PLATFORM'] == 'win32':
-	print('Windows Build')
-	
-	LIBS += [
-		'opengl32',
-		'kernel32',
-		'ucrtd', # d suffix is debug
-		'advapi32',
+    print('Windows Build')
+    
+    
+    """
+    LIBS += [
+        'opengl32',
+        'kernel32',
+        'libucrtd', # d suffix is debug
+        'advapi32',
         'comdlg32',
         'gdi32',
         'odbc32',
@@ -280,231 +282,335 @@ if env['PLATFORM'] == 'win32':
         'user32',
         'uuid',
         'winspool',
-        'vcruntime',
-        'msvcrtd' # d suffix is debug
+        'libvcruntime',
+        'msvcrtd', # d suffix is debug
+        #'libcmtd',
+        'libcpmtd',
+    ]
+    """
+    LIBS += [ # d suffix is debug
+        'opengl32', # OpenGL
+        'kernel32', # Windows
+        
+        # Dynamic
+        'ucrtd', # Universal C runtime
+        'msvcrtd', # C runtime startup
+        'msvcprtd', # C++ standard
+        'vcruntimed', # C++ runtime
+
+        # Static
+        #'libucrtd', # Universal C runtime
+        #'libcmtd', # C runtime startup
+        #'libcpmtd', # C++ standard
+        #'libvcruntime', # C++ runtime
+
+        'advapi32',
+        'comdlg32',
+        'gdi32',
+        'odbc32',
+        'odbccp32',
+        'ole32',
+        'oleaut32',
+        'shell32',
+        'user32',
+        'uuid',
+        'winspool',
+
+    ]
+    
+    INCLUDE += [
+        '/Users/Riordan/scoop/apps/sdl2/current/include'
+    ]
+    
+    LIBPATH += [
+        '/Users/Riordan/scoop/apps/sdl2/current/lib'
+    ]
+    
+    LINKFLAGS += [
+        #'/ENTRY:main', # Caused me so much linker grief with crt_initialisation
+        #'/FORCE', # This is just cheating... runtime bugs inbound
+        '/DEBUG',
+        #'/OPT:REF',
+        #'/WX',
+        #'/VERBOSE',
+        #'/MANIFEST',
+        '/NOLOGO',
+        '/INCREMENTAL',
+        #'/MACHINE:X64', #/MACHINE:{ARM|EBC|X64|X86}
+        #'/NXCOMPAT',
+        #'/DYNAMICBASE', # generate an executable image that's rebased at load time by using the address space layout randomization (ASLR) feature.
+        '/SUBSYSTEM:CONSOLE', #{BOOT_APPLICATION|CONSOLE|NATIVE|POSIX|WINDOWS}
+        #'/NODEFAULTLIB',
     ]
 
-	INCLUDE += [
-		'/Users/Riordan/scoop/apps/sdl2/current/include'
-	]
-	
-	LIBPATH += [
-		'/Users/Riordan/scoop/apps/sdl2/current/lib'
-	]
-	
-	LINKFLAGS += [
-		'/ENTRY:main',
-		'/DEBUG',
-		'/WX',
-		#'/VERBOSE:LIB',
-		'/NOLOGO',
-		'/INCREMENTAL',
-		'/MACHINE:X64',	#/MACHINE:{ARM|EBC|X64|X86}
-		'/NXCOMPAT',
-		'/DYNAMICBASE',
-		'/SUBSYSTEM:WINDOWS', #{BOOT_APPLICATION|CONSOLE|EFI_APPLICATION|EFI_BOOT_SERVICE_DRIVER|EFI_ROM|EFI_RUNTIME_DRIVER|NATIVE|POSIX|WINDOWS}
-		'/NODEFAULTLIB',
-	]
+    CPPDEFINES = [
+        '_DEBUG',
+        '_WIN64',
+        '_CRT_SECURE_NO_WARNINGS',
+        '_CRT_SECURE_NO_DEPRECATE',
+        '_SCL_SECURE_NO_WARNINGS',
+        'WIN32',
+        'CURL_STATICLIB',
+        'SDL_MAIN_HANDLED'
+    ]
 
-	CPPDEFINES = [
-		'_DEBUG',
-		'WIN32',
-		'CURL_STATICLIB',
-		'SDL_MAIN_HANDLED'
-	]
+    CCFLAGS = [
+        '/FC', # full path name
+        '/Zi', # debug info
+        #'/WX', # All warnings as errors
+        '/std:c++14', # C++ standard
+        '/EHsc', # Enable C++ exceptions
+        #'/RTC1', # runtime checks
+        #'/GF', # String pooling
+        '/Od', # Disables optimization.
+        #'/Gy', # Function level linking
+        #'/TP', # Explicit C++ compiling
+        #'/sdl',
+        '/MDd', # Dynamic libs
+        #'/GS-', # security buffer (- disables it) disables /sdl
+        #'/MTd' # Static libs
+    ]
 
-	CCFLAGS = [
-		'/FC',
-		'/W1',
-		'/std:c++17',
-		#'/RTC1',
-		'/Od',
-		#'/sdl',
-		'/MDd',
-		'/GS-' # disables /sdl
-		#'/MTd' # WARNING: d at the end means debug version
-	]
+    # Modules
+    if env['modules'] == 'yes':
+        CPPDEFINES += [
+            '__MODULES__'
+        ]
+        if env['cgltf'] == 'yes':
+            CPPDEFINES += [
+                '__CGLTF__'
+            ]
+            INCLUDE += [
+                'modules/cgltf/'
+            ]
+        if env['nuklear'] == 'yes':
+            CPPDEFINES += [
+                '__NUKLEAR__',
+            ]
+            INCLUDE += [
+                'modules/nuklear/'
+            ]
+        if env['bullet'] == 'yes':
+            CPPDEFINES += [
+                '__BULLET__',
+                'BT_USE_OLD_DAMPING_METHOD',
+                'BT_CLAMP_VELOCITY_TO=9999'
+            ]
+            if env['float'] == '64': CPPDEFINES += ['BT_USE_DOUBLE_PRECISION=1']
+            INCLUDE += [
+                'modules/bullet/',
+                #'modules/bullet/Bullet3Collision',
+                #'modules/bullet/Bullet3Collision/BroadPhaseCollision',
+                #'modules/bullet/Bullet3Collision/BroadPhaseCollision/shared',
+                #'modules/bullet/Bullet3Collision/NarrowPhaseCollision',
+                #'modules/bullet/Bullet3Collision/NarrowPhaseCollision/shared',
+                'modules/bullet/Bullet3Common/',
+                'modules/bullet/Bullet3Common/shared/',
+                #'modules/bullet/Bullet3Dynamics',
+                #'modules/bullet/Bullet3Dynamics/ConstraintSolver',
+                #'modules/bullet/Bullet3Dynamics/shared',
+                #'modules/bullet/Bullet3Geometry',
+                #'modules/bullet/Bullet3OpenCL',
+                #'modules/bullet/Bullet3OpenCL/BroadphaseCollision',
+                #'modules/bullet/Bullet3OpenCL/BroadphaseCollision/kernels',
+                #'modules/bullet/Bullet3OpenCL/Initialize',
+                #'modules/bullet/Bullet3OpenCL/NarrowphaseCollision',
+                #'modules/bullet/Bullet3OpenCL/NarrowphaseCollision/kernels',
+                #'modules/bullet/Bullet3OpenCL/ParallelPrimitives',
+                #'modules/bullet/Bullet3OpenCL/ParallelPrimitives/kernels',
+                #'modules/bullet/Bullet3OpenCL/Raycast',
+                #'modules/bullet/Bullet3OpenCL/Raycast/kernels',
+                #'modules/bullet/Bullet3OpenCL/RigidBody',
+                #'modules/bullet/Bullet3OpenCL/RigidBody/kernels',
+                #'modules/bullet/Bullet3Serialize',
+                #'modules/bullet/Bullet3Serialize/Bullet2FileLoader',
+                #'modules/bullet/Bullet3Serialize/Bullet2FileLoader/autogenerated',
+                'modules/bullet/BulletCollision/',
+                'modules/bullet/BulletCollision/BroadphaseCollision/',
+                'modules/bullet/BulletCollision/CollisionDispatch/',
+                'modules/bullet/BulletCollision/CollisionShapes/',
+                'modules/bullet/BulletCollision/Gimpact/',
+                'modules/bullet/BulletCollision/NarrowPhaseCollision/',
+                'modules/bullet/BulletDynamics/',
+                'modules/bullet/BulletDynamics/Character/',
+                'modules/bullet/BulletDynamics/ConstraintSolver/',
+                'modules/bullet/BulletDynamics/Dynamics/',
+                'modules/bullet/BulletDynamics/Featherstone/',
+                'modules/bullet/BulletDynamics/MLCPSolvers/',
+                'modules/bullet/BulletDynamics/Vehicle/',
+                'modules/bullet/BulletInverseDynamics/',
+                'modules/bullet/BulletInverseDynamics/details/',
+                'modules/bullet/BulletSoftBody/',
+                'modules/bullet/clew/',
+                'modules/bullet/LinearMath/',
+                'modules/bullet/LinearMath/TaskScheduler/',
+            ]
+            src_files += get_bullet_source()
 
-	# Modules
-	if env['modules'] == 'yes':
-		CPPDEFINES += [
-			'__MODULES__'
-		]
-		if env['cgltf'] == 'yes':
-			CPPDEFINES += [
-				'__CGLTF__'
-			]
-			INCLUDE += [
-				'modules/cgltf/'
-			]
-		if env['nuklear'] == 'yes':
-			CPPDEFINES += [
-				'__NUKLEAR__',
-			]
-			INCLUDE += [
-				'modules/nuklear/'
-			]
 
-	env.Append(LINKFLAGS = LINKFLAGS)
-	env.Append(LIBS = LIBS)
-	env.Append(LIBPATH = LIBPATH)
-	env.Append(CPPPATH = INCLUDE)
-	env.Append(CCFLAGS = CCFLAGS)
-	env.Append(CPPFLAGS = []) # Same as CCFLAGS on windows
-	env.Append(CXXFLAGS = ['/DEBUG'])
-	env.Append(CPPDEFINES = CPPDEFINES)
+    env.Append(LINKFLAGS = LINKFLAGS)
+    env.Append(LIBS = LIBS)
+    env.Append(LIBPATH = LIBPATH)
+    env.Append(CPPPATH = INCLUDE)
+    env.Append(CCFLAGS = CCFLAGS)
+    env.Append(CPPFLAGS = CCFLAGS) # Same as CCFLAGS on windows
+    env.Append(CXXFLAGS = ['/DEBUG'])
+    env.Append(CPPDEFINES = CPPDEFINES)
 
-	# MSVS Build commands
-	batch_file = find_visual_c_batch_file(env)
+    # MSVS Build commands
+    batch_file = find_visual_c_batch_file(env)
 
-	env["MSVSBUILDCOM"] = build_commandline("scons", 1)
-	env["MSVSREBUILDCOM"] = build_commandline("scons", 1)
-	env["MSVSCLEANCOM"] = build_commandline("scons --clean", 1)
-	env['CCPDBFLAGS'] = '/Zi /Fd${TARGET}.pdb'
+    env["MSVSBUILDCOM"] = build_commandline("scons", 1)
+    env["MSVSREBUILDCOM"] = build_commandline("scons", 1)
+    env["MSVSCLEANCOM"] = build_commandline("scons --clean", 1)
+    env['CCPDBFLAGS'] = '/Zi /Fd${TARGET}.pdb'
 
-	project = env.Program(target=bin, source=src_files, LIBS=LIBS, LIBPATH=LIBPATH, LINKFLAGS=LINKFLAGS)
-	buildtarget = [s for s in project if str(s).endswith('exe')]
-	platform = ['|x64', '|x86', '|Win32']
+    project = env.Program(target=bin, source=src_files, LIBS=LIBS, LIBPATH=LIBPATH, LINKFLAGS=LINKFLAGS)
+    buildtarget = [s for s in project if str(s).endswith('exe')]
+    platform = ['|x64', '|x86', '|Win32']
 
-	env.MSVSProject(target = name + env['MSVSPROJECTSUFFIX'],
-	                srcs = [str(file) for file in src_files],
-	                #cppdefines=[],
-	                #cppflags=[],
-	                #cpppaths=[],
-	                incs = INCLUDE,
-	                #localincs = None,
-	                #resources = None,
-	                #misc = None,
-	                buildtarget = project,
-	                variant = env['target'] + "|Win32")
+    src_files = [str(file) for file in src_files]
+    
+    env.MSVSProject(target = name + env['MSVSPROJECTSUFFIX'],
+                    srcs = src_files,
+                    #cppdefines=[],
+                    #cppflags=[],
+                    #cpppaths=[],
+                    incs = INCLUDE,
+                    #localincs = None,
+                    #resources = None,
+                    #misc = None,
+                    buildtarget = project,
+                    variant = env['target'] + "|Win32")
+    
 elif env['PLATFORM'] == 'posix':
-	print('POSIX Build')
+    print('POSIX Build')
 
-	env['CC'] = env['CXX']
+    env['CC'] = env['CXX']
 
-	# Linux only
-	if env['target'] == 'debug':
-	    env.Append(CCFLAGS = ['-Wall', '-g', '-O0', '-DDEBUG'])
-	elif env['target'] == 'release':
-	    env.Append(CCFLAGS = ['-Wall', '-O3', '-DNDEBUG'])
-	    env.Append(LINKFLAGS = ['-s'])
-	elif env['target'] == 'profile':
-	    env.Append(CCFLAGS = ['-Wall', '-pg', '-O0', '-DNDEBUG'])
+    # Linux only
+    if env['target'] == 'debug':
+        env.Append(CCFLAGS = ['-Wall', '-g', '-O0', '-DDEBUG'])
+    elif env['target'] == 'release':
+        env.Append(CCFLAGS = ['-Wall', '-O3', '-DNDEBUG'])
+        env.Append(LINKFLAGS = ['-s'])
+    elif env['target'] == 'profile':
+        env.Append(CCFLAGS = ['-Wall', '-pg', '-O0', '-DNDEBUG'])
 
-	# Core for POSIX
-	INCLUDE += [
-		'/usr/include/SDL2/'
-	]
-	
-	LIBPATH += [
-		'/usr/lib/x86_64-linux-gnu/'
-	]
+    # Core for POSIX
+    INCLUDE += [
+        '/usr/include/SDL2/'
+    ]
+    
+    LIBPATH += [
+        '/usr/lib/x86_64-linux-gnu/'
+    ]
 
-	LIBS += [
-		'dl',
-		'GL'
-	]
+    LIBS += [
+        'dl',
+        'GL'
+    ]
 
-	CPPDEFINES += [
-		'__POSIX__'
-	]
+    CPPDEFINES += [
+        '__POSIX__'
+    ]
 
-	# Modules
-	if env['modules'] == 'yes':
-		CPPDEFINES += [
-			'__MODULES__'
-		]
-		if env['cgltf'] == 'yes':
-			CPPDEFINES += [
-				'__CGLTF__'
-			]
-			INCLUDE += [
-				'modules/cgltf/'
-			]
-		if env['nuklear'] == 'yes':
-			CPPDEFINES += [
-				'__NUKLEAR__',
-			]
+    # Modules
+    if env['modules'] == 'yes':
+        CPPDEFINES += [
+            '__MODULES__'
+        ]
+        if env['cgltf'] == 'yes':
+            CPPDEFINES += [
+                '__CGLTF__'
+            ]
+            INCLUDE += [
+                'modules/cgltf/'
+            ]
+        if env['nuklear'] == 'yes':
+            CPPDEFINES += [
+                '__NUKLEAR__',
+            ]
 
-			INCLUDE += [
-				'modules/nuklear/'
-			]
-		if env['bullet'] == 'yes':
-			CPPDEFINES += [
-				'__BULLET__',
-				'BT_USE_OLD_DAMPING_METHOD',
-			]
-			if env['float'] == '64': CPPDEFINES += ['BT_USE_DOUBLE_PRECISION=1']
-			INCLUDE += [
-				'modules/bullet/',
-				#'modules/bullet/Bullet3Collision',
-				#'modules/bullet/Bullet3Collision/BroadPhaseCollision',
-				#'modules/bullet/Bullet3Collision/BroadPhaseCollision/shared',
-				#'modules/bullet/Bullet3Collision/NarrowPhaseCollision',
-				#'modules/bullet/Bullet3Collision/NarrowPhaseCollision/shared',
-				'modules/bullet/Bullet3Common',
-				'modules/bullet/Bullet3Common/shared',
-				#'modules/bullet/Bullet3Dynamics',
-				#'modules/bullet/Bullet3Dynamics/ConstraintSolver',
-				#'modules/bullet/Bullet3Dynamics/shared',
-				#'modules/bullet/Bullet3Geometry',
-				#'modules/bullet/Bullet3OpenCL',
-				#'modules/bullet/Bullet3OpenCL/BroadphaseCollision',
-				#'modules/bullet/Bullet3OpenCL/BroadphaseCollision/kernels',
-				#'modules/bullet/Bullet3OpenCL/Initialize',
-				#'modules/bullet/Bullet3OpenCL/NarrowphaseCollision',
-				#'modules/bullet/Bullet3OpenCL/NarrowphaseCollision/kernels',
-				#'modules/bullet/Bullet3OpenCL/ParallelPrimitives',
-				#'modules/bullet/Bullet3OpenCL/ParallelPrimitives/kernels',
-				#'modules/bullet/Bullet3OpenCL/Raycast',
-				#'modules/bullet/Bullet3OpenCL/Raycast/kernels',
-				#'modules/bullet/Bullet3OpenCL/RigidBody',
-				#'modules/bullet/Bullet3OpenCL/RigidBody/kernels',
-				#'modules/bullet/Bullet3Serialize',
-				#'modules/bullet/Bullet3Serialize/Bullet2FileLoader',
-				#'modules/bullet/Bullet3Serialize/Bullet2FileLoader/autogenerated',
-				'modules/bullet/BulletCollision',
-				'modules/bullet/BulletCollision/BroadphaseCollision',
-				'modules/bullet/BulletCollision/CollisionDispatch',
-				'modules/bullet/BulletCollision/CollisionShapes',
-				'modules/bullet/BulletCollision/Gimpact',
-				'modules/bullet/BulletCollision/NarrowPhaseCollision',
-				'modules/bullet/BulletDynamics',
-				'modules/bullet/BulletDynamics/Character',
-				'modules/bullet/BulletDynamics/ConstraintSolver',
-				'modules/bullet/BulletDynamics/Dynamics',
-				'modules/bullet/BulletDynamics/Featherstone',
-				'modules/bullet/BulletDynamics/MLCPSolvers',
-				'modules/bullet/BulletDynamics/Vehicle',
-				'modules/bullet/BulletInverseDynamics',
-				'modules/bullet/BulletInverseDynamics/details',
-				'modules/bullet/BulletSoftBody',
-				'modules/bullet/clew',
-				'modules/bullet/LinearMath',
-				'modules/bullet/LinearMath/TaskScheduler',
-			]
-			src_files += get_bullet_source()
+            INCLUDE += [
+                'modules/nuklear/'
+            ]
+        if env['bullet'] == 'yes':
+            CPPDEFINES += [
+                '__BULLET__',
+                'BT_USE_OLD_DAMPING_METHOD',
+            ]
+            if env['float'] == '64': CPPDEFINES += ['BT_USE_DOUBLE_PRECISION=1']
+            INCLUDE += [
+                'modules/bullet/',
+                #'modules/bullet/Bullet3Collision',
+                #'modules/bullet/Bullet3Collision/BroadPhaseCollision',
+                #'modules/bullet/Bullet3Collision/BroadPhaseCollision/shared',
+                #'modules/bullet/Bullet3Collision/NarrowPhaseCollision',
+                #'modules/bullet/Bullet3Collision/NarrowPhaseCollision/shared',
+                'modules/bullet/Bullet3Common/',
+                'modules/bullet/Bullet3Common/shared/',
+                #'modules/bullet/Bullet3Dynamics',
+                #'modules/bullet/Bullet3Dynamics/ConstraintSolver',
+                #'modules/bullet/Bullet3Dynamics/shared',
+                #'modules/bullet/Bullet3Geometry',
+                #'modules/bullet/Bullet3OpenCL',
+                #'modules/bullet/Bullet3OpenCL/BroadphaseCollision',
+                #'modules/bullet/Bullet3OpenCL/BroadphaseCollision/kernels',
+                #'modules/bullet/Bullet3OpenCL/Initialize',
+                #'modules/bullet/Bullet3OpenCL/NarrowphaseCollision',
+                #'modules/bullet/Bullet3OpenCL/NarrowphaseCollision/kernels',
+                #'modules/bullet/Bullet3OpenCL/ParallelPrimitives',
+                #'modules/bullet/Bullet3OpenCL/ParallelPrimitives/kernels',
+                #'modules/bullet/Bullet3OpenCL/Raycast',
+                #'modules/bullet/Bullet3OpenCL/Raycast/kernels',
+                #'modules/bullet/Bullet3OpenCL/RigidBody',
+                #'modules/bullet/Bullet3OpenCL/RigidBody/kernels',
+                #'modules/bullet/Bullet3Serialize',
+                #'modules/bullet/Bullet3Serialize/Bullet2FileLoader',
+                #'modules/bullet/Bullet3Serialize/Bullet2FileLoader/autogenerated',
+                'modules/bullet/BulletCollision/',
+                'modules/bullet/BulletCollision/BroadphaseCollision/',
+                'modules/bullet/BulletCollision/CollisionDispatch/',
+                'modules/bullet/BulletCollision/CollisionShapes/',
+                'modules/bullet/BulletCollision/Gimpact/',
+                'modules/bullet/BulletCollision/NarrowPhaseCollision/',
+                'modules/bullet/BulletDynamics/',
+                'modules/bullet/BulletDynamics/Character/',
+                'modules/bullet/BulletDynamics/ConstraintSolver/',
+                'modules/bullet/BulletDynamics/Dynamics/',
+                'modules/bullet/BulletDynamics/Featherstone/',
+                'modules/bullet/BulletDynamics/MLCPSolvers/',
+                'modules/bullet/BulletDynamics/Vehicle/',
+                'modules/bullet/BulletInverseDynamics/',
+                'modules/bullet/BulletInverseDynamics/details/',
+                'modules/bullet/BulletSoftBody/',
+                'modules/bullet/clew/',
+                'modules/bullet/LinearMath/',
+                'modules/bullet/LinearMath/TaskScheduler/',
+            ]
+            src_files += get_bullet_source()
 
-	env.Append(LINKFLAGS = LINKFLAGS)
-	env.Append(LIBS = LIBS)
-	env.Append(LIBPATH = LIBPATH)
-	env.Append(CPPPATH = INCLUDE)
-	env.Append(CCFLAGS = CCFLAGS)
-	env.Append(CPPFLAGS = []) # Same as CCFLAGS on windows
-	env.Append(CXXFLAGS = ['-std=c++11'])
-	env.Append(CPPDEFINES = CPPDEFINES)
+    env.Append(LINKFLAGS = LINKFLAGS)
+    env.Append(LIBS = LIBS)
+    env.Append(LIBPATH = LIBPATH)
+    env.Append(CPPPATH = INCLUDE)
+    env.Append(CCFLAGS = CCFLAGS)
+    env.Append(CPPFLAGS = []) # Same as CCFLAGS on windows
+    env.Append(CXXFLAGS = ['-std=c++14'])
+    env.Append(CPPDEFINES = CPPDEFINES)
 
-	project = env.Program(
-		target=bin, 
-		source=src_files, 
-		CPPPATH=INCLUDE, 
-		LIBS=LIBS, 
-		LIBPATH=LIBPATH, 
-		LINKFLAGS=LINKFLAGS)
+    project = env.Program(
+        target=bin, 
+        source=src_files, 
+        CPPPATH=INCLUDE, 
+        LIBS=LIBS, 
+        LIBPATH=LIBPATH, 
+        LINKFLAGS=LINKFLAGS)
 
-	#env.Install('/usr/bin', [project])
-	#env.Alias('install', '/usr/bin')
+    #env.Install('/usr/bin', [project])
+    #env.Alias('install', '/usr/bin')
 else:
-	print(f"Platform: {env['PLATFORM']} does not have a supported build script")
+    print(f"Platform: {env['PLATFORM']} does not have a supported build script")
 
 

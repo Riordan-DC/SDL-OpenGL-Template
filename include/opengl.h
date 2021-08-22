@@ -1,6 +1,7 @@
 #ifndef OPENGL_H
 #define OPENGL_H
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,14 +16,14 @@ static struct {
 	uint32_t program;
 
 	// stats
-	uint32_t shader_switches = 0;
-	uint32_t shaders = 0;
+	uint32_t shader_switches;
+	uint32_t shaders;
 } gpu_state;
 
 static struct {
-	void* alloc = NULL;
-	void* free = NULL;
-} allocator;
+	void* (*alloc)(size_t size);
+	void (*free)(void* ref);
+} gl_allocator;
 
 void gl_use_program(uint32_t program);
 GLuint gl_compile_shader(GLenum type, const char** sources, int* lengths, int count);
