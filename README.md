@@ -11,5 +11,5 @@ OpenGL functions are loaded with Glad. If you require specific support or extens
 Physics is processed using Bullet physics, statically linked.
 The iconic cgltf library is used for loading gltf 3d files.
 GUI system backend is Nuklear, so cool.
-Sean Barrett's image and audio loading headers.
+SDL's image and audio (and perhaps Sean Barrett's) loading functions.
 cJSON for loading and writing JSON, a nice format.
