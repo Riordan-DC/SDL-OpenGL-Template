@@ -2,10 +2,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-// SDL2
-#include <SDL2/SDL.h>
-//#include <SDL/SDL_opengl.h>
-
 #include "glad.h"
 
 #ifdef __MODULES__
@@ -29,6 +25,7 @@
 		#define NK_INCLUDE_DEFAULT_FONT
 	    #define NK_IMPLEMENTATION
 		#define NK_SDL_GL3_IMPLEMENTATION
+		#define NK_INCLUDE_STANDARD_VARARGS
 	    #include "nuklear.h"
 		#include "nuklear_sdl_gl3.h"
 		#include "style.c"
@@ -44,109 +41,15 @@
 
 #endif
 
-
-
-#include "test.h"
-
+#include "opengl.h"
+#include "shader.h"
+#include "util.h"
+#include "gl.h"
 
 
 SDL_Window* window;
 SDL_GLContext* gl_context;
 int SDL_Window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
-
-void init_glad(void) {
-	// Load OpenGL function pointers
-	// This version of GLAD does NOT include a loader:
-	//      gladLoadGL();
-	if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
-		printf("[x] Failed to initialize GLAD");
-		abort();
-	}
-
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_MULTISAMPLE);
-	fprintf(stderr, "[-] OpenGL Version [%s]\n", glGetString(GL_VERSION));
-	fprintf(stderr, "[-] CPU Cache line size [%d bytes]\n", SDL_GetCPUCacheLineSize());
-}
-
-SDL_Window* new_SDL_Window(int screen_width, int screen_height, char* window_name) {
-	int error = SDL_Init(SDL_INIT_VIDEO); //SDL_InitSubSystem(SDL_INIT_VIDEO);
-	
-	if (error == -1) {
-		// SDL Error
-		fprintf(stderr, "[x] Cannot initialize SDL video!");
-	}
-
-	SDL_Window* window = SDL_CreateWindow(
-		window_name, 				// window title
-		SDL_WINDOWPOS_CENTERED, 	// x position
-		SDL_WINDOWPOS_CENTERED, 	// y position
-		screen_width, 				// width, in pixels
-		screen_height,				// height, in pixels
-		SDL_Window_flags			// flags
-	);
-
-	if (window == NULL) {
-		// SDL Error
-		fprintf(stderr, "[x] Could not create SDL window: %s", SDL_GetError());
-	}
-	
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
-	return window;
-}
-
-SDL_GLContext* new_SDL_GLContext(SDL_Window* window, int context_width, int context_height, int openGL_major, int openGL_minor, int msaa_samples, int msaa_bufs) {
-	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE); //OpenGL core profile
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, openGL_major);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, openGL_minor);
-
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-
-
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, msaa_samples);
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, msaa_bufs);
-
-	// Often 32-bit is the max. WARNING: Increasing can decrease performance. Default: 16
-	// Changing to 24-bits on Linux crashes
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16); 
-
-	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 5);
-	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 5);
-	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 5);
-	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
-
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-
-
-#ifdef __APPLE__
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-	SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
-#elif __POSIX__
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-#endif
-	// Turn on double buffering with a 24bit Z buffer.
-	// You may need to change this to 16 or 32 for your system
-	 //SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	 //SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-
-	SDL_GLContext* context = (SDL_GLContext*)SDL_GL_CreateContext(window);
-
-	if (context == NULL) {
-		fprintf(stderr, "[x] Could not create SDL context: %s", SDL_GetError());
-	}
-
-	SDL_GL_SetSwapInterval(1);
-	init_glad();
-
-	glEnable(GL_MULTISAMPLE);
-	// TODO: Add resizable viewport
-	glViewport(0, 0, context_width, context_height);
-	
-	return context;
-}
 
 /*
 static void gltf_parse(const void* ptr, uint64_t num_bytes);
@@ -156,64 +59,31 @@ static void gltf_parse_materials(const cgltf_data* gltf);
 static void gltf_parse_meshes(const cgltf_data* gltf);
 static void gltf_parse_nodes(const cgltf_data* gltf);
 */
-struct nk_canvas {
-    struct nk_command_buffer *painter;
-    struct nk_vec2 item_spacing;
-    struct nk_vec2 panel_padding;
-    struct nk_style_item window_background;
-};
-
-static void
-canvas_begin(struct nk_context *ctx, struct nk_canvas *canvas, nk_flags flags,
-    int x, int y, int width, int height, struct nk_color background_color)
-{
-    /* save style properties which will be overwritten */
-    canvas->panel_padding = ctx->style.window.padding;
-    canvas->item_spacing = ctx->style.window.spacing;
-    canvas->window_background = ctx->style.window.fixed_background;
-
-    /* use the complete window space and set background */
-    ctx->style.window.spacing = nk_vec2(0,0);
-    ctx->style.window.padding = nk_vec2(0,0);
-    ctx->style.window.fixed_background = nk_style_item_color(background_color);
-
-    /* create/update window and set position + size */
-    flags = flags & ~NK_WINDOW_DYNAMIC;
-    nk_window_set_bounds(ctx, "Window", nk_rect(x, y, width, height));
-    nk_begin(ctx, "Window", nk_rect(x, y, width, height), NK_WINDOW_NO_SCROLLBAR|flags);
-
-    /* allocate the complete window space for drawing */
-    {struct nk_rect total_space;
-    total_space = nk_window_get_content_region(ctx);
-    nk_layout_row_dynamic(ctx, total_space.h, 1);
-    nk_widget(&total_space, ctx);
-    canvas->painter = nk_window_get_canvas(ctx);}
-}
-
-static void
-canvas_end(struct nk_context *ctx, struct nk_canvas *canvas)
-{
-    nk_end(ctx);
-    ctx->style.window.spacing = canvas->panel_padding;
-    ctx->style.window.padding = canvas->item_spacing;
-    ctx->style.window.fixed_background = canvas->window_background;
-}
 
 void resize_window(SDL_Window* window, int window_width, int window_height) {
     SDL_SetWindowSize(window, window_width, window_height);
     glViewport(0, 0, window_width, window_height);
 }
 
+void log_function(void* user_data, int level, const char* tag, const char* format, va_list args) {
+	static const char* levels[4] = {"debug", "info", "warn", "error"};
+	// Note: userdata can hold state information. e.g: GUI console
+	fprintf(stderr, "%s(%s):", levels[level], tag);
+	vfprintf(stderr, format, args);
+}
+
 int main(int argc, char* argv[]) {
-	window = new_SDL_Window(1200, 800, "SDL-OpenGL-Project");
+	roy_set_log_callback(log_function, NULL);
+	window = SDL_Window_new(1200, 800, "SDL-OpenGL-Project", SDL_Window_flags);
 	gl_context = new_SDL_GLContext(
 		window, 
-		500, 500, 
+		1200, 800, 
 		4, 6, // OpenGL major, minor version
 		4, 1);
 
 	glEnable(GL_DEPTH_TEST);
 
+/*
 	// Build the broadphase
 	btBroadphaseInterface* broadphase = new btDbvtBroadphase();
 
@@ -226,8 +96,44 @@ int main(int argc, char* argv[]) {
 
 	// The world.
 	btDiscreteDynamicsWorld* dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+*/
+
+	// Load shaders
+	FILE* vertex_shader_file = fopen("shader/normal.vert", "rb");
+	fseek(vertex_shader_file, 0, SEEK_END);
+	long int vertex_shader_size = ftell(vertex_shader_file);
+	fseek(vertex_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
+	assert(vertex_shader_size <= MAX_SHADER_LEN);
+	char *shader_vertex_source = (char*)malloc(vertex_shader_size + 1);
+	fread(shader_vertex_source, 1, vertex_shader_size, vertex_shader_file);
+	fclose(vertex_shader_file);
+	shader_vertex_source[vertex_shader_size] = 0;
+
+	FILE* fragment_shader_file = fopen("shader/normal.frag", "rb");
+	fseek(fragment_shader_file, 0, SEEK_END);
+	long int fragment_shader_size = ftell(fragment_shader_file);
+	fseek(fragment_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
+	assert(fragment_shader_size <= MAX_SHADER_LEN);
+	char *shader_fragment_source = (char*)malloc(fragment_shader_size + 1);
+	fread(shader_fragment_source, 1, fragment_shader_size, fragment_shader_file);
+	fclose(fragment_shader_file);
+	shader_fragment_source[fragment_shader_size] = 0;
+
+	struct shader_t normal_shader;
+	shader_delete(&normal_shader);
+
+	shader_graphics_new(
+		&normal_shader, 
+		shader_vertex_source, (int)vertex_shader_size, 
+		shader_fragment_source, (int)fragment_shader_size
+	);
+	free(shader_vertex_source);
+	free(shader_fragment_source);
+
+	roy_log(LOG_INFO, "SHADER", "Shader built, program id: %d, shader type: %d", normal_shader.program, normal_shader.type);
 
 	#if 0
+
 	// Load model
 	fprintf(stderr, "[-] Loading model: %s\n", argv[1]);
 	cgltf_options options;
@@ -289,7 +195,7 @@ int main(int argc, char* argv[]) {
 	enum {EASY, HARD};
 	static int op = EASY;
 	static float value = 0.6f;
-	
+
 	SDL_Event event;
 	bool quit = false;
 	while (!quit) {
@@ -313,22 +219,26 @@ int main(int argc, char* argv[]) {
         nk_input_end(ctx);
 
 		// PHYSICS
-		dynamicsWorld->stepSimulation(
-			0.01,						// Time since last step
-			7,								// Mas substep count
-			btScalar(1.) / btScalar(60.));	// Fixed time step 
+		//dynamicsWorld->stepSimulation(
+		//	0.01,						// Time since last step
+		//	7,								// Mas substep count
+		//	btScalar(1.) / btScalar(60.));	// Fixed time step 
+
+		// GRAPHICS
+        gl_use_program(normal_shader.program);
 
 		// GUI        
 		struct nk_canvas canvas;
-        canvas_begin(ctx, &canvas, 0, 0, 0, width, 30, nk_rgb(250,250,250));
+        canvas_begin(ctx, &canvas, 0, 0, 0, width, 30, nk_rgb(100,100,100));
         {
             nk_draw_text(canvas.painter, nk_rect(0, 0, 150, 30), "Roy v0.1", 8, ctx->style.font, nk_rgb(188,174,118), nk_rgb(0,0,0));
+            nk_draw_text(canvas.painter, nk_rect(70, 0, 200, 30), "<Scene Name>* (unsaved)", 23, ctx->style.font, nk_rgb(150,150,150), nk_rgb(0,0,0));
         }
         canvas_end(ctx, &canvas);
         
 
-        if (nk_begin(ctx, "Show", nk_rect(50, 50, 220, 220),
-            NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_CLOSABLE)) {
+        if (nk_begin(ctx, "Roy Scene", nk_rect(50, 50, 220, 3*220),
+            NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE)) { // NK_WINDOW_CLOSABLE | NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_SCALE_LEFT
             /* fixed widget pixel width */
             nk_layout_row_static(ctx, 30, 80, 1);
             if (nk_button_label(ctx, "button")) {
@@ -349,8 +259,11 @@ int main(int argc, char* argv[]) {
                 nk_slider_float(ctx, 0, &value, 1.0f, 0.01f);
             }
             nk_layout_row_end(ctx);
+
+
         }
         nk_end(ctx);
+
 
         /* Draw */
         glViewport(0, 0, width, height);

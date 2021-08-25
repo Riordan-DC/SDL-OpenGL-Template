@@ -1,7 +1,7 @@
 #ifndef MESH_H
 #define MESH_H
 
-#include <bool.h>
+#include <stdbool.h>
 
 #include "shader.h"
 
@@ -15,7 +15,7 @@ struct mesh_t {
 /* Model */
 struct model_t {
 
-	bool static;
+	bool static_body;
 };
 
 /* Skeleton */

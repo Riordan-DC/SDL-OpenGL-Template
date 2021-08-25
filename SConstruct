@@ -327,7 +327,7 @@ if env['PLATFORM'] == 'win32':
     ]
     
     LINKFLAGS += [
-        #'/ENTRY:main', # Caused me so much linker grief with crt_initialisation
+        #'/ENTRY:main', # Caused me so much linker grief with crt_initialisation, https://stackoverflow.com/questions/2086045/msvcrtd-libcpu-disp-obj-warning-lnk4210-crt-section-exists-there-may-be-u
         #'/FORCE', # This is just cheating... runtime bugs inbound
         '/DEBUG',
         #'/OPT:REF',
@@ -369,6 +369,7 @@ if env['PLATFORM'] == 'win32':
         '/MDd', # Dynamic libs
         #'/GS-', # security buffer (- disables it) disables /sdl
         #'/MTd' # Static libs
+        '/MP', # Multi-processor compilation
     ]
 
     # Modules
@@ -465,11 +466,11 @@ if env['PLATFORM'] == 'win32':
     env["MSVSCLEANCOM"] = build_commandline("scons --clean", 1)
     env['CCPDBFLAGS'] = '/Zi /Fd${TARGET}.pdb'
 
+    src_files = [str(file) for file in src_files]
+
     project = env.Program(target=bin, source=src_files, LIBS=LIBS, LIBPATH=LIBPATH, LINKFLAGS=LINKFLAGS)
     buildtarget = [s for s in project if str(s).endswith('exe')]
     platform = ['|x64', '|x86', '|Win32']
-
-    src_files = [str(file) for file in src_files]
     
     env.MSVSProject(target = name + env['MSVSPROJECTSUFFIX'],
                     srcs = src_files,
