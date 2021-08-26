@@ -18,10 +18,18 @@ typedef struct {
   uint64_t* values;
 } map_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void map_init(map_t* map, uint32_t n);
 void map_free(map_t* map);
 uint64_t map_get(map_t* map, uint64_t hash);
 void map_set(map_t* map, uint64_t hash, uint64_t value);
 void map_remove(map_t* map, uint64_t hash);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

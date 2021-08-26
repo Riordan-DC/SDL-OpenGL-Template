@@ -1,6 +1,7 @@
 #ifndef GL_H
 #define GL_H
 
+#include "opengl.h"
 #include "shader.h"
 #include "mesh.h"
 #include "linalg.h"
@@ -112,8 +113,8 @@ enum camera_type {
 };
 
 struct camera_t {
-	mat4 view_matrix;
-	mat4 projection_matrix;
+	float view_matrix[16];
+	float projection_matrix[16];
 	enum camera_type type;
 };
 
@@ -140,11 +141,6 @@ void camera_look_at(camera_t *camera, vec3 pos) {
 		roy_log(LOG_WARN, "GL", "camera Look At is unimplimented for ORTHOGRAPHIC type cameras");
 	}
 }
-
-// GPU buffer
-struct buffer_t {
-
-};
 
 // draw_call
 struct draw_call_t {

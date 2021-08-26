@@ -70,6 +70,7 @@ void log_function(void* user_data, int level, const char* tag, const char* forma
 	// Note: userdata can hold state information. e.g: GUI console
 	fprintf(stderr, "%s(%s):", levels[level], tag);
 	vfprintf(stderr, format, args);
+	fprintf(stderr, "\n");
 }
 
 int main(int argc, char* argv[]) {
@@ -103,7 +104,6 @@ int main(int argc, char* argv[]) {
 	fseek(vertex_shader_file, 0, SEEK_END);
 	long int vertex_shader_size = ftell(vertex_shader_file);
 	fseek(vertex_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
-	assert(vertex_shader_size <= MAX_SHADER_LEN);
 	char *shader_vertex_source = (char*)malloc(vertex_shader_size + 1);
 	fread(shader_vertex_source, 1, vertex_shader_size, vertex_shader_file);
 	fclose(vertex_shader_file);
@@ -113,7 +113,6 @@ int main(int argc, char* argv[]) {
 	fseek(fragment_shader_file, 0, SEEK_END);
 	long int fragment_shader_size = ftell(fragment_shader_file);
 	fseek(fragment_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
-	assert(fragment_shader_size <= MAX_SHADER_LEN);
 	char *shader_fragment_source = (char*)malloc(fragment_shader_size + 1);
 	fread(shader_fragment_source, 1, fragment_shader_size, fragment_shader_file);
 	fclose(fragment_shader_file);
@@ -131,6 +130,28 @@ int main(int argc, char* argv[]) {
 	free(shader_fragment_source);
 
 	roy_log(LOG_INFO, "SHADER", "Shader built, program id: %d, shader type: %d", normal_shader.program, normal_shader.type);
+
+	// triangle
+	buffer_t* triangle_verts;
+	buffer_t* triangle_indices;
+	float vertices[] = {
+		.0, .5, .0,
+		.5, .0, .0,
+		.0, .0, .5
+	};
+	triangle_verts = buffer_new(sizeof(vertices), vertices, BUFFER_VERTEX, USAGE_STATIC, false);	
+
+	unsigned int indices[] = {0, 1, 2};
+	triangle_indices = buffer_new(sizeof(indices), indices, BUFFER_INDEX, USAGE_STATIC, false);	
+
+	GLuint VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	glBindVertexArray(0);
+
+	roy_log(LOG_INFO, "GPU", "buffer memory: %d", gl_gpu_state_buffer_memory());
 
 	#if 0
 
@@ -196,6 +217,10 @@ int main(int argc, char* argv[]) {
 	static int op = EASY;
 	static float value = 0.6f;
 
+	// camera
+	camera_t camera;
+	camera_new(&camera, PERSPECTIVE, 70., (float)width / (float)height);
+
 	SDL_Event event;
 	bool quit = false;
 	while (!quit) {
@@ -218,6 +243,10 @@ int main(int argc, char* argv[]) {
         }
         nk_input_end(ctx);
 
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+
 		// PHYSICS
 		//dynamicsWorld->stepSimulation(
 		//	0.01,						// Time since last step
@@ -226,6 +255,32 @@ int main(int argc, char* argv[]) {
 
 		// GRAPHICS
         gl_use_program(normal_shader.program);
+		/*
+        float mvp[16];
+        mat4_identity(mvp);
+        mat4_mul(mvp, camera.view_matrix);
+        mat4_mul(mvp, camera.projection_matrix);
+		shader_set_uniform(&normal_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
+		uint64_t index = map_get(&normal_shader.uniform_map, hash64("MVP", strlen("MVP")));
+		roy_assert(index != MAP_NIL, "Cannot find shader uniform!");
+		
+		struct uniform_t uniform = normal_shader.uniforms.data[index];
+		//shader_set_uniform(normal_shader, "Model", void* data, uint32_t start, uint32_t count, uint32_t size);
+		glUniformMatrix4fv(uniform.location, uniform.count, GL_FALSE, (GLfloat*)uniform.value.data);
+		*/
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glDisable(GL_CULL_FACE);
+		glBindVertexArray(VAO);
+		gl_gpu_bind_buffer(triangle_verts->type, triangle_verts->id);
+		gl_gpu_bind_buffer(triangle_indices->type, triangle_indices->id);
+		glDrawElements(
+			GL_TRIANGLES,
+			triangle_indices->size,
+			GL_UNSIGNED_INT, // WARNING: This may be different depending on mesh size and will need to be passed to the Mesh at load
+			(void*)0); // offset
+		glBindVertexArray(0);
+		gl_use_program(0);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 		// GUI        
 		struct nk_canvas canvas;
@@ -266,15 +321,13 @@ int main(int argc, char* argv[]) {
 
 
         /* Draw */
-        glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         /* IMPORTANT: `nk_sdl_render` modifies some global OpenGL state
          * with blending, scissor, face culling, depth test and viewport and
          * defaults everything back into a default state.
          * Make sure to either a.) save and restore or b.) reset your own state after
          * rendering the UI. */
-        nk_sdl_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_MEMORY, MAX_ELEMENT_MEMORY);		SDL_GL_SwapWindow(window);
+        nk_sdl_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_MEMORY, MAX_ELEMENT_MEMORY);
+		SDL_GL_SwapWindow(window);
 	}
 
     nk_sdl_shutdown();
