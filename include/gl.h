@@ -142,6 +142,12 @@ void camera_look_at(camera_t *camera, vec3 pos) {
 	}
 }
 
+void camera_set_pos(camera_t* camera, vec3 pos) {
+	camera->view_matrix[13] = pos[0];
+	camera->view_matrix[14] = pos[1];
+	camera->view_matrix[15] = pos[2];
+}
+
 // draw_call
 struct draw_call_t {
 

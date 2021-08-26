@@ -219,8 +219,12 @@ int main(int argc, char* argv[]) {
 
 	// camera
 	camera_t camera;
-	camera_new(&camera, PERSPECTIVE, 70., (float)width / (float)height);
-
+	camera_new(&camera, PERSPECTIVE, 50., (float)width / (float)height);
+	float pos[3] = {.0, .0, 5.};
+	camera_set_pos(&camera, pos);
+	float origin[3] = {.0, .0, .0};
+	camera_look_at(&camera, origin);
+	
 	SDL_Event event;
 	bool quit = false;
 	while (!quit) {
@@ -255,11 +259,14 @@ int main(int argc, char* argv[]) {
 
 		// GRAPHICS
         gl_use_program(normal_shader.program);
-		/*
+		
         float mvp[16];
         mat4_identity(mvp);
         mat4_mul(mvp, camera.view_matrix);
         mat4_mul(mvp, camera.projection_matrix);
+        float model[16];
+        mat4_identity(model);
+        mat4_mul(mvp, model);
 		shader_set_uniform(&normal_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
 		uint64_t index = map_get(&normal_shader.uniform_map, hash64("MVP", strlen("MVP")));
 		roy_assert(index != MAP_NIL, "Cannot find shader uniform!");
@@ -267,7 +274,7 @@ int main(int argc, char* argv[]) {
 		struct uniform_t uniform = normal_shader.uniforms.data[index];
 		//shader_set_uniform(normal_shader, "Model", void* data, uint32_t start, uint32_t count, uint32_t size);
 		glUniformMatrix4fv(uniform.location, uniform.count, GL_FALSE, (GLfloat*)uniform.value.data);
-		*/
+		
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDisable(GL_CULL_FACE);
 		glBindVertexArray(VAO);
