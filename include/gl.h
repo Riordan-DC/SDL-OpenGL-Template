@@ -115,6 +115,8 @@ enum camera_type {
 struct camera_t {
 	float view_matrix[16];
 	float projection_matrix[16];
+	float camera_front[3];
+	float camera_up[3];
 	enum camera_type type;
 };
 
@@ -123,11 +125,19 @@ int camera_new(camera_t *camera, enum camera_type type, float fov, float aspect)
 	// aspect: width / height of viewport
 	camera->type = type;
 	if (type == PERSPECTIVE) {
-		mat4_perspective(camera->projection_matrix, .01f, 100.f, fov * (float) M_PI / 180.f, aspect);
+		mat4_perspective(camera->projection_matrix, .001f, 1000.f, fov * (float) M_PI / 180.f, aspect);
 	} else {
 		mat4_orthographic(camera->projection_matrix, -1.0, 1.0, 1.0, -1.0, .01f, 100.f);
 	}
     mat4_identity(camera->view_matrix);
+    camera->camera_front[0] = .0;
+    camera->camera_front[0] = .0;
+    camera->camera_front[0] =  1.;
+
+    camera->camera_up[0] = .0;
+    camera->camera_up[0] =  1.;
+    camera->camera_up[0] = .0;
+
     return 0;
 }
 
@@ -142,10 +152,10 @@ void camera_look_at(camera_t *camera, vec3 pos) {
 	}
 }
 
-void camera_set_pos(camera_t* camera, vec3 pos) {
-	camera->view_matrix[13] = pos[0];
-	camera->view_matrix[14] = pos[1];
-	camera->view_matrix[15] = pos[2];
+inline void camera_set_pos(camera_t* camera, vec3 pos) {
+	camera->view_matrix[12] = pos[0];
+	camera->view_matrix[13] = pos[1];
+	camera->view_matrix[14] = pos[2];
 }
 
 // draw_call

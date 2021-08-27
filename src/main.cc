@@ -73,6 +73,23 @@ void log_function(void* user_data, int level, const char* tag, const char* forma
 	fprintf(stderr, "\n");
 }
 
+void camera_handle_input(camera_t* camera, double dt) {
+	const Uint8 *state = SDL_GetKeyboardState(NULL);
+	float speed = 1.0 * (float)dt;
+	if (state[SDL_SCANCODE_W]) { // +x
+	    camera->view_matrix[14] += speed;
+	}
+	if (state[SDL_SCANCODE_A]) { // +z
+	    camera->view_matrix[12] += speed;
+	}
+	if (state[SDL_SCANCODE_S]) { // -x
+	    camera->view_matrix[14] -= speed;
+	}
+	if (state[SDL_SCANCODE_D]) { // -z
+	    camera->view_matrix[12] -= speed;
+	}
+}
+
 int main(int argc, char* argv[]) {
 	roy_set_log_callback(log_function, NULL);
 	window = SDL_Window_new(1200, 800, "SDL-OpenGL-Project", SDL_Window_flags);
@@ -135,23 +152,42 @@ int main(int argc, char* argv[]) {
 	buffer_t* triangle_verts;
 	buffer_t* triangle_indices;
 	float vertices[] = {
-		.0, .5, .0,
-		.5, .0, .0,
-		.0, .0, .5
+		// bottom square
+		// x     y     z
+	     0.5f,  0.0f,  0.5f,
+	    -0.5f,  0.0f,  0.5f,
+	    -0.5f,  0.0f, -0.5f,
+	     0.5f,  0.0f, -0.5f,
+	     // top square
+	     0.5f,  0.5f,  0.5f,
+	    -0.5f,  0.5f,  0.5f,
+	    -0.5f,  0.5f, -0.5f,
+	     0.5f,  0.5f, -0.5f,
 	};
 	triangle_verts = buffer_new(sizeof(vertices), vertices, BUFFER_VERTEX, USAGE_STATIC, false);	
 
-	unsigned int indices[] = {0, 1, 2};
+	unsigned int indices[] = {
+		// bottom face
+		0, 1, 2,
+		2, 3, 0,
+		// top face
+		4, 5, 6,
+		6, 7, 4,
+		// back side face
+		0, 4, 7,
+		7, 3, 0
+	};
 	triangle_indices = buffer_new(sizeof(indices), indices, BUFFER_INDEX, USAGE_STATIC, false);	
 
 	GLuint VAO;
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
+	// vertex position attribute
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	glBindVertexArray(0);
 
-	roy_log(LOG_INFO, "GPU", "buffer memory: %d", gl_gpu_state_buffer_memory());
+	roy_log(LOG_INFO, "GPU", "buffer memory: %d bytes", gl_gpu_state_buffer_memory());
 
 	#if 0
 
@@ -219,122 +255,271 @@ int main(int argc, char* argv[]) {
 
 	// camera
 	camera_t camera;
-	camera_new(&camera, PERSPECTIVE, 50., (float)width / (float)height);
-	float pos[3] = {.0, .0, 5.};
+	camera_new(&camera, PERSPECTIVE, 60., (float)width / (float)height);
+	float pos[3] = {.0, -0.8, -3.0};
 	camera_set_pos(&camera, pos);
-	float origin[3] = {.0, .0, .0};
-	camera_look_at(&camera, origin);
+	//float origin[3] = {.0, .0, .0};
+	//camera_look_at(&camera, origin);
+
+	// model pose
+    float model[16];
+    mat4_identity(model);
 	
+	// main loop 
+	int64_t accumulator = 0;
+	bool resync = false;
+	double update_rate = 60;
+	bool unlock_framerate = true;
+	int update_multiplicity = 1;
+	roy_log(LOG_INFO, "LOOP", "Update rate (variable frame rate) : %f", update_rate);
+	const double fixed_dt = 1.f / update_rate;
+	int64_t desired_frametime = SDL_GetPerformanceFrequency() / update_rate;
+	const int time_history_count = 4;
+	int64_t time_averager[4] = { desired_frametime, desired_frametime, desired_frametime, desired_frametime };
+	int64_t vsync_maxerror = SDL_GetPerformanceFrequency() * 0.0002;
+	int64_t time_60hz = SDL_GetPerformanceFrequency() / 60; //since this is about snapping to common vsync values
+	int64_t snap_frequencies[] = {
+		time_60hz,          //60fps
+		time_60hz * 2,      //30fps
+		time_60hz * 3,      //20fps
+		time_60hz * 4,      //15fps
+		(time_60hz + 1) / 2,  //120fps //120hz, 240hz, or higher need to round up, so that adding 120hz twice guaranteed is at least the same as adding time_60hz once
+		(time_60hz+2)/3,  //180fps //that's where the +1 and +2 come from in those equations
+		(time_60hz+3)/4,  //240fps //I do not want to snap to anything higher than 120 in my engine, but I left the math in here anyway
+	};
+	int64_t prev_frame_time = SDL_GetPerformanceCounter();
+
 	SDL_Event event;
 	bool quit = false;
+
 	while (!quit) {
-		nk_input_begin(ctx);
-        while (SDL_PollEvent(&event)) {
-            switch (event.type) {
-            case SDL_QUIT:
-                quit = true;
-                break;
-            case SDL_WINDOWEVENT:
-                switch (event.window.event) {
-                case SDL_WINDOWEVENT_RESIZED:
-                    width = event.window.data1;
-                    height = event.window.data2;
-                    resize_window(window, width, height);
-                    break;
-                }
-            }
-            nk_sdl_handle_event(&event);
-        }
-        nk_input_end(ctx);
+		int64_t current_frame_time  = SDL_GetPerformanceCounter();
+		int64_t delta_time = current_frame_time  - prev_frame_time;
+		prev_frame_time = current_frame_time;
+		if (delta_time > desired_frametime * 8) delta_time = desired_frametime; //ignore extra-slow frames
+		if (delta_time < 0) delta_time = 0;
 
-		glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+		//vsync time snapping
+		for (unsigned int snap = 0; snap < 5; snap++) {
+			if (llabs(delta_time - snap_frequencies[snap]) < vsync_maxerror) {
+				delta_time = snap_frequencies[snap];
+				break;
+			}
+		}
 
-		// PHYSICS
-		//dynamicsWorld->stepSimulation(
-		//	0.01,						// Time since last step
-		//	7,								// Mas substep count
-		//	btScalar(1.) / btScalar(60.));	// Fixed time step 
+		for (int i = 0; i < time_history_count - 1; i++) {
+			time_averager[i] = time_averager[i + 1];
+		}
 
-		// GRAPHICS
-        gl_use_program(normal_shader.program);
+		time_averager[time_history_count - 1] = delta_time;
+		delta_time = 0;
 		
-        float mvp[16];
-        mat4_identity(mvp);
-        mat4_mul(mvp, camera.view_matrix);
-        mat4_mul(mvp, camera.projection_matrix);
-        float model[16];
-        mat4_identity(model);
-        mat4_mul(mvp, model);
-		shader_set_uniform(&normal_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
-		uint64_t index = map_get(&normal_shader.uniform_map, hash64("MVP", strlen("MVP")));
-		roy_assert(index != MAP_NIL, "Cannot find shader uniform!");
+		for (int i = 0; i < time_history_count; i++) delta_time += time_averager[i];
 		
-		struct uniform_t uniform = normal_shader.uniforms.data[index];
-		//shader_set_uniform(normal_shader, "Model", void* data, uint32_t start, uint32_t count, uint32_t size);
-		glUniformMatrix4fv(uniform.location, uniform.count, GL_FALSE, (GLfloat*)uniform.value.data);
+		delta_time /= time_history_count;
+		accumulator += delta_time;
 		
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glDisable(GL_CULL_FACE);
-		glBindVertexArray(VAO);
-		gl_gpu_bind_buffer(triangle_verts->type, triangle_verts->id);
-		gl_gpu_bind_buffer(triangle_indices->type, triangle_indices->id);
-		glDrawElements(
-			GL_TRIANGLES,
-			triangle_indices->size,
-			GL_UNSIGNED_INT, // WARNING: This may be different depending on mesh size and will need to be passed to the Mesh at load
-			(void*)0); // offset
-		glBindVertexArray(0);
-		gl_use_program(0);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//spiral of death protection
+		if (accumulator > desired_frametime * 8) resync = true;
 
-		// GUI        
-		struct nk_canvas canvas;
-        canvas_begin(ctx, &canvas, 0, 0, 0, width, 30, nk_rgb(100,100,100));
-        {
-            nk_draw_text(canvas.painter, nk_rect(0, 0, 150, 30), "Roy v0.1", 8, ctx->style.font, nk_rgb(188,174,118), nk_rgb(0,0,0));
-            nk_draw_text(canvas.painter, nk_rect(70, 0, 200, 30), "<Scene Name>* (unsaved)", 23, ctx->style.font, nk_rgb(150,150,150), nk_rgb(0,0,0));
-        }
-        canvas_end(ctx, &canvas);
-        
+		//timer resync if requested
+		if (resync) {
+			accumulator = 0;
+			delta_time = desired_frametime;
+			resync = false;
+		}
 
-        if (nk_begin(ctx, "Roy Scene", nk_rect(50, 50, 220, 3*220),
-            NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE)) { // NK_WINDOW_CLOSABLE | NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_SCALE_LEFT
-            /* fixed widget pixel width */
-            nk_layout_row_static(ctx, 30, 80, 1);
-            if (nk_button_label(ctx, "button")) {
-                /* event handling */
-            }
+		if (unlock_framerate) {
+			int64_t consumed_dt = delta_time;
+			while (accumulator >= desired_frametime) {
+				SDL_PumpEvents();
+				// Previous state = current state
+				// Integrate current state
+				// FIXED UPDATE
+				//game->fixed_update(fixed_dt);
+				
 
-            /* fixed widget window ratio width */
-            nk_layout_row_dynamic(ctx, 30, 2);
-            if (nk_option_label(ctx, "easy", op == EASY)) op = EASY;
-            if (nk_option_label(ctx, "hard", op == HARD)) op = HARD;
+				if (consumed_dt > desired_frametime) { //cap variable update's dt to not be larger than fixed update, and interleave it (so game state can always get animation frames it needs)
+					// VARIABLE UPDATE
+					//game->variable_update(fixed_dt);
 
-            /* custom widget pixel width */
-            nk_layout_row_begin(ctx, NK_STATIC, 30, 2);
-            {
-                nk_layout_row_push(ctx, 50);
-                nk_label(ctx, "Volume:", NK_TEXT_LEFT);
-                nk_layout_row_push(ctx, 110);
-                nk_slider_float(ctx, 0, &value, 1.0f, 0.01f);
-            }
-            nk_layout_row_end(ctx);
+					consumed_dt -= desired_frametime;
+				}
+				accumulator -= desired_frametime;
+			}
+			// VARIABLE UPDATE
+			//game->variable_update((double)consumed_dt / SDL_GetPerformanceFrequency());
+
+			// GRAPHICS
+			//game->render((double)accumulator / desired_frametime, delta_time);
+			double dt = ((double)delta_time / (double)SDL_GetPerformanceFrequency());
+
+			// Gather Inputs
+			SDL_PumpEvents();
+			nk_input_begin(ctx);
+	        while (SDL_PollEvent(&event)) {
+	            switch (event.type) {
+	            case SDL_QUIT:
+	                quit = true;
+	                break;
+	            case SDL_WINDOWEVENT:
+	                switch (event.window.event) {
+	                case SDL_WINDOWEVENT_RESIZED:
+	                    width = event.window.data1;
+	                    height = event.window.data2;
+	                    resize_window(window, width, height);
+	                    break;
+	                }
+	            }
+	            nk_sdl_handle_event(&event);
+	        }
+	        nk_input_end(ctx);
+			camera_handle_input(&camera, dt);
+
+			// GRAPHICS
+			//game->render(1.0, 1.0);
+			glViewport(0, 0, width, height);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+
+			// GRAPHICS
+	        gl_use_program(normal_shader.program);
+	        
+			//camera_look_at(&camera, origin);
+	        float mvp[16];
+	        mat4_identity(mvp);
+
+	        mat4_rotate(model, 100. * dt * (float) M_PI / 180.f,.0,1.,.0);
+	        // set model pos
+	        //model[12] = .0;
+	        //model[13] = .0;
+	        //model[14] = .0;
+	        mat4_mul(mvp, camera.projection_matrix);
+	        mat4_mul(mvp, camera.view_matrix);
+	        mat4_mul(mvp, model);
+
+			shader_set_uniform(&normal_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
+			uint64_t index = map_get(&normal_shader.uniform_map, hash64("MVP", strlen("MVP")));
+			roy_assert(index != MAP_NIL, "Cannot find shader uniform!");
+			
+			struct uniform_t uniform = normal_shader.uniforms.data[index];
+			//shader_set_uniform(normal_shader, "Model", void* data, uint32_t start, uint32_t count, uint32_t size);
+			glUniformMatrix4fv(uniform.location, uniform.count, GL_FALSE, (GLfloat*)uniform.value.data);
+			
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			glDisable(GL_CULL_FACE);
+			glBindVertexArray(VAO);
+			gl_gpu_bind_buffer(triangle_verts->type, triangle_verts->id);
+			//glDrawArrays(GL_TRIANGLES, 0, 36);
+			gl_gpu_bind_buffer(triangle_indices->type, triangle_indices->id);
+			glDrawElements(
+				GL_TRIANGLES,
+				triangle_indices->size,
+				GL_UNSIGNED_INT, // WARNING: This may be different depending on mesh size and will need to be passed to the Mesh at load
+				(void*)0); // offset
+			glBindVertexArray(0);
+			gl_use_program(0);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+			// GUI        
+			struct nk_canvas canvas;
+	        canvas_begin(ctx, &canvas, 0, 0, 0, width, 30, nk_rgb(100,100,100));
+	        {
+	            nk_draw_text(canvas.painter, nk_rect(0, 0, 150, 30), "Roy v0.1", 8, ctx->style.font, nk_rgb(188,174,118), nk_rgb(0,0,0));
+	            nk_draw_text(canvas.painter, nk_rect(70, 0, 200, 30), "<Scene Name>* (unsaved)", 23, ctx->style.font, nk_rgb(150,150,150), nk_rgb(0,0,0));
+	        }
+	        canvas_end(ctx, &canvas);
+	        
+
+	        if (nk_begin(ctx, "Roy Scene", nk_rect(10, 40, 220, 3*220),
+	            NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE)) { // NK_WINDOW_CLOSABLE | NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_SCALE_LEFT
+	            /* fixed widget pixel width */
+	            nk_layout_row_static(ctx, 30, 80, 1);
+	            if (nk_button_label(ctx, "button")) {
+	                /* event handling */
+	            }
+
+	            /* fixed widget window ratio width */
+	            nk_layout_row_dynamic(ctx, 30, 2);
+	            if (nk_option_label(ctx, "easy", op == EASY)) op = EASY;
+	            if (nk_option_label(ctx, "hard", op == HARD)) op = HARD;
+
+	            /* custom widget pixel width */
+	            nk_layout_row_begin(ctx, NK_STATIC, 30, 2);
+	            {
+	                nk_layout_row_push(ctx, 50);
+	                nk_label(ctx, "Volume:", NK_TEXT_LEFT);
+	                nk_layout_row_push(ctx, 110);
+	                nk_slider_float(ctx, 0, &value, 1.0f, 0.01f);
+	            }
+	            nk_layout_row_end(ctx);
+	            
+	            nk_layout_row_static(ctx, 30, 100, 1);
+	            {
+		            static char text[3][64];
+		            static int text_len[3];
+	                nk_label(ctx, "Camera X:", NK_TEXT_LEFT);
+	                nk_edit_string(ctx, NK_EDIT_SIMPLE, text[0], &text_len[0], 64, nk_filter_float);
+	                nk_label(ctx, "Camera Y:", NK_TEXT_LEFT);
+	                nk_edit_string(ctx, NK_EDIT_SIMPLE, text[1], &text_len[1], 64, nk_filter_float);
+	                nk_label(ctx, "Camera Z:", NK_TEXT_LEFT);
+	                nk_edit_string(ctx, NK_EDIT_SIMPLE, text[2], &text_len[2], 64, nk_filter_float);
+	                if (text_len[0] > 0) camera.view_matrix[12] = (float)atof(text[0]);
+	                if (text_len[1] > 0) camera.view_matrix[13] = (float)atof(text[1]);
+	                if (text_len[2] > 0) camera.view_matrix[14] = (float)atof(text[2]);
+
+	            }
+
+	            nk_layout_row_static(ctx, 30, 180, 1);
+	            {
+	                char cam_pos_label[64];
+	                snprintf(cam_pos_label, 64, "(%.3f,%.3f,%.3f)\0", camera.view_matrix[12], camera.view_matrix[13], camera.view_matrix[14]);
+	                nk_label(ctx, cam_pos_label, NK_TEXT_LEFT);
+	            }
+
+	            nk_layout_row_static(ctx, 30, 200, 1);
+	            {
+	                char fps_label[64];
+		            double fps = 1.0 / dt;
+	                snprintf(fps_label, 64, "fps:%lf\0", fps);
+	                nk_label(ctx, fps_label, NK_TEXT_LEFT);
+	            }
+	        }
+	        nk_end(ctx);
+
+	        /* Draw */
+	        /* IMPORTANT: `nk_sdl_render` modifies some global OpenGL state
+	         * with blending, scissor, face culling, depth test and viewport and
+	         * defaults everything back into a default state.
+	         * Make sure to either a.) save and restore or b.) reset your own state after
+	         * rendering the UI. */
+	        nk_sdl_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_MEMORY, MAX_ELEMENT_MEMORY);
+			SDL_GL_SwapWindow(window);
 
 
-        }
-        nk_end(ctx);
+			SDL_FlushEvent(SDL_KEYDOWN);
+		}
+		else {
+			roy_assert(false, "I have not implimented unlock framerate because this loop is just for testing atm.");
+			while (accumulator >= desired_frametime * update_multiplicity) {
+				for (int i = 0; i < update_multiplicity; i++) {
+					// FIXED UPDATE
+					//game->fixed_update(fixed_dt);
 
+					// PHYSICS
+					//dynamicsWorld->stepSimulation(
+					//	0.01,						// Time since last step
+					//	7,								// Mas substep count
+					//	btScalar(1.) / btScalar(60.));	// Fixed time step 
 
-        /* Draw */
-        /* IMPORTANT: `nk_sdl_render` modifies some global OpenGL state
-         * with blending, scissor, face culling, depth test and viewport and
-         * defaults everything back into a default state.
-         * Make sure to either a.) save and restore or b.) reset your own state after
-         * rendering the UI. */
-        nk_sdl_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_MEMORY, MAX_ELEMENT_MEMORY);
-		SDL_GL_SwapWindow(window);
+					// VARIABLE UPDATE
+					//game->variable_update(fixed_dt);
+					
+					accumulator -= desired_frametime;
+				}
+			}
+
+		}
 	}
 
     nk_sdl_shutdown();
