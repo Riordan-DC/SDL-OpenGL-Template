@@ -115,8 +115,12 @@ enum camera_type {
 struct camera_t {
 	float view_matrix[16];
 	float projection_matrix[16];
-	float camera_front[3];
-	float camera_up[3];
+	float camera_pos[4];
+	float camera_front[4];
+	float camera_up[4];
+	float camera_right[4];
+	float yaw;
+	float pitch;
 	enum camera_type type;
 };
 
@@ -131,31 +135,72 @@ int camera_new(camera_t *camera, enum camera_type type, float fov, float aspect)
 	}
     mat4_identity(camera->view_matrix);
     camera->camera_front[0] = .0;
-    camera->camera_front[0] = .0;
-    camera->camera_front[0] =  1.;
+    camera->camera_front[1] = .0;
+	camera->camera_front[2] = -1.;
+	camera->camera_front[3] = 1.; // w
 
     camera->camera_up[0] = .0;
-    camera->camera_up[0] =  1.;
-    camera->camera_up[0] = .0;
+    camera->camera_up[1] =  1.;
+    camera->camera_up[2] = .0;
+	camera->camera_up[3] = 1.; // w
 
+	camera->camera_right[0] = .0;
+	camera->camera_right[1] = .0;
+	camera->camera_right[2] = .0;
+	camera->camera_right[3] = 1.; // w
+
+	camera->camera_pos[0] = .0;
+	camera->camera_pos[1] = .0;
+	camera->camera_pos[2] = .0;
+	camera->camera_pos[3] = 1.; // w
+
+    camera->yaw = -90.;
+    camera->pitch = .0;
     return 0;
+}
+
+void camera_update_matrices(camera_t* camera) {
+	float front[4] = { .0, .0, .0, 1. };
+	front[0] = cos(RAD(camera->yaw)) * cos(RAD(camera->pitch));
+	front[1] = sin(RAD(camera->pitch));
+	front[2] = sin(RAD(camera->yaw)) * cos(RAD(camera->pitch));
+	vec3_normalize(front);
+	vec3_init(camera->camera_front, front);
+
+	float world_up[4] = { .0, 1., .0, 1. };
+	float right[4] = { .0, .0, .0, 1. };
+	vec3_init(right, camera->camera_front);
+	vec3_cross(right, world_up);
+	vec3_normalize(right);
+	vec3_init(camera->camera_right, right);
+
+	float up[4] = { .0, .0, .0, 1. };
+	vec3_init(up, camera->camera_right);
+	vec3_cross(up, camera->camera_front);
+	vec3_normalize(up);
+	vec3_init(camera->camera_up, up);
+
+	camera->view_matrix[12] = camera->camera_pos[0];
+	camera->view_matrix[13] = camera->camera_pos[1];
+	camera->view_matrix[14] = camera->camera_pos[2];
 }
 
 void camera_look_at(camera_t *camera, vec3 pos) {
 	if (camera->type == PERSPECTIVE) {
-		float cam_pos[3];
-		float up[3] = {.0, 1., .0};
-		mat4_getPosition(camera->projection_matrix, cam_pos);
-		mat4_lookAt(camera->projection_matrix, cam_pos, pos, up);
+		mat4_lookAt(camera->view_matrix, camera->camera_pos, pos, camera->camera_up);
 	} else {
 		roy_log(LOG_WARN, "GL", "camera Look At is unimplimented for ORTHOGRAPHIC type cameras");
 	}
 }
 
 inline void camera_set_pos(camera_t* camera, vec3 pos) {
-	camera->view_matrix[12] = pos[0];
-	camera->view_matrix[13] = pos[1];
-	camera->view_matrix[14] = pos[2];
+	camera->camera_pos[0] = pos[0];
+	camera->camera_pos[1] = pos[1];
+	camera->camera_pos[2] = pos[2];
+}
+
+inline void camera_move(camera_t* camera, vec3 move) {
+	vec3_add(camera->camera_pos, move);
 }
 
 // draw_call

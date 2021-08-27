@@ -74,20 +74,68 @@ void log_function(void* user_data, int level, const char* tag, const char* forma
 }
 
 void camera_handle_input(camera_t* camera, double dt) {
+	// Rotate
+	if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
+		int x, y;
+		SDL_GetRelativeMouseState(&x, &y);
+
+		float xoffset = (float)x;
+		float yoffset = -(float)y;
+
+		float sensitivity = 0.1f; // change this value to your liking
+		xoffset *= sensitivity;
+		yoffset *= sensitivity;
+
+		camera->yaw += xoffset;
+		camera->pitch += yoffset;
+
+		// make sure that when pitch is out of bounds, screen doesn't get flipped
+		if (camera->pitch > 89.0f)
+			camera->pitch = 89.0f;
+		if (camera->pitch < -89.0f)
+			camera->pitch = -89.0f;
+
+	}
+
+	// Movement
 	const Uint8 *state = SDL_GetKeyboardState(NULL);
 	float speed = 1.0 * (float)dt;
-	if (state[SDL_SCANCODE_W]) { // +x
-	    camera->view_matrix[14] += speed;
+	float pos[4] = {.0, .0, .0, 1.};
+	if (state[SDL_SCANCODE_W]) { // forwards
+		float move_dir[4] = { .0, .0, .0, 1. };
+		vec3_init(move_dir, camera->camera_front);
+		vec3_scale(move_dir, speed);
+	    vec3_add(pos, move_dir);
 	}
-	if (state[SDL_SCANCODE_A]) { // +z
-	    camera->view_matrix[12] += speed;
+	if (state[SDL_SCANCODE_S]) { // backwards
+		float move_dir[4] = { .0, .0, .0, 1. };
+		vec3_init(move_dir, camera->camera_front);
+		vec3_scale(move_dir, speed);
+	    vec3_sub(pos, move_dir);
 	}
-	if (state[SDL_SCANCODE_S]) { // -x
-	    camera->view_matrix[14] -= speed;
+	if (state[SDL_SCANCODE_A]) { // left
+		float move_dir[4] = { .0, .0, .0, 1. };
+		vec3_init(move_dir, camera->camera_front);
+		vec3_cross(move_dir, camera->camera_up);
+		vec3_normalize(move_dir);
+		vec3_scale(move_dir, speed);
+	    vec3_sub(pos, move_dir);
 	}
-	if (state[SDL_SCANCODE_D]) { // -z
-	    camera->view_matrix[12] -= speed;
+	if (state[SDL_SCANCODE_D]) { // right
+		float move_dir[4] = { .0, .0, .0, 1. };
+		vec3_init(move_dir, camera->camera_front);
+		vec3_cross(move_dir, camera->camera_up);
+		vec3_normalize(move_dir);
+		vec3_scale(move_dir, speed);
+	    vec3_add(pos, move_dir);
 	}
+	camera_move(camera, pos);
+	camera_update_matrices(camera);
+
+	float look_dir[4] = { .0, .0, .0, 1. };
+	vec3_init(look_dir, camera->camera_pos);
+	vec3_add(look_dir, camera->camera_front);
+	camera_look_at(camera, look_dir);
 }
 
 int main(int argc, char* argv[]) {
@@ -245,6 +293,7 @@ int main(int argc, char* argv[]) {
 
 	set_style(ctx, THEME_BLACK);
 
+	bool mouse_captured = false;
     int width = 0, height = 0;
     SDL_GetWindowSize(window, &width, &height);
 	glViewport(0, 0, width, height);
@@ -256,14 +305,14 @@ int main(int argc, char* argv[]) {
 	// camera
 	camera_t camera;
 	camera_new(&camera, PERSPECTIVE, 60., (float)width / (float)height);
-	float pos[3] = {.0, -0.8, -3.0};
+	float pos[4] = {.0, .0, .0, 1.};
 	camera_set_pos(&camera, pos);
-	//float origin[3] = {.0, .0, .0};
-	//camera_look_at(&camera, origin);
+	//camera_look_at(&camera, camera.camera_front);
 
 	// model pose
     float model[16];
     mat4_identity(model);
+	mat4_translate(model, .0, -0.3, .0);
 	
 	// main loop 
 	int64_t accumulator = 0;
@@ -362,6 +411,15 @@ int main(int argc, char* argv[]) {
 	            case SDL_QUIT:
 	                quit = true;
 	                break;
+	            case SDL_KEYUP:
+	            	switch (event.key.keysym.scancode) {
+            		case SDL_SCANCODE_ESCAPE: 
+		            	mouse_captured = !mouse_captured;
+		            	SDL_SetRelativeMouseMode(mouse_captured ? SDL_TRUE : SDL_FALSE);
+		            	break;
+	            	}
+	            	break;
+	            
 	            case SDL_WINDOWEVENT:
 	                switch (event.window.event) {
 	                case SDL_WINDOWEVENT_RESIZED:
@@ -385,18 +443,14 @@ int main(int argc, char* argv[]) {
 			// GRAPHICS
 	        gl_use_program(normal_shader.program);
 	        
-			//camera_look_at(&camera, origin);
 	        float mvp[16];
 	        mat4_identity(mvp);
 
-	        mat4_rotate(model, 100. * dt * (float) M_PI / 180.f,.0,1.,.0);
-	        // set model pos
-	        //model[12] = .0;
-	        //model[13] = .0;
-	        //model[14] = .0;
+	        //mat4_rotate(model, 100. * dt * (float) M_PI / 180.f,.0,1.,.0);
+
 	        mat4_mul(mvp, camera.projection_matrix);
-	        mat4_mul(mvp, camera.view_matrix);
-	        mat4_mul(mvp, model);
+			mat4_mul(mvp, camera.view_matrix);
+			mat4_mul(mvp, model);
 
 			shader_set_uniform(&normal_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
 			uint64_t index = map_get(&normal_shader.uniform_map, hash64("MVP", strlen("MVP")));
@@ -481,9 +535,23 @@ int main(int argc, char* argv[]) {
 	            {
 	                char fps_label[64];
 		            double fps = 1.0 / dt;
-	                snprintf(fps_label, 64, "fps:%lf\0", fps);
+	                snprintf(fps_label, 64, "fps:%.3lf\0", fps);
 	                nk_label(ctx, fps_label, NK_TEXT_LEFT);
 	            }
+
+				nk_layout_row_static(ctx, 30, 200, 1);
+				{
+					char cam_angle_label[64];
+					snprintf(cam_angle_label, 64, "yaw:%.2f,pitch:%.2f\0", camera.yaw, camera.pitch);
+					nk_label(ctx, cam_angle_label, NK_TEXT_LEFT);
+				}
+
+				nk_layout_row_static(ctx, 30, 200, 1);
+				{
+					char cam_front_label[64];
+					snprintf(cam_front_label, 64, "x:%.2f,y:%.2f,z:%.2f\0", camera.camera_front[0], camera.camera_front[1], camera.camera_front[2]);
+					nk_label(ctx, cam_front_label, NK_TEXT_LEFT);
+				}
 	        }
 	        nk_end(ctx);
 

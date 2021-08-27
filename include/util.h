@@ -30,6 +30,8 @@
 #define CLAMP(x, min, max) MAX(min, MIN(max, x))
 #define ALIGN(p, n) (((uintptr_t) (p) + (n - 1)) & ~(n - 1))
 #define CHECK_SIZEOF(T) int(*_o)[sizeof(T)]=1
+#define RAD(x) x * (float)M_PI / 180.0
+#define DEG(x) x * 180.0 / (float)M_PI
 
 typedef struct Color { float r, g, b, a; } Color;
 
