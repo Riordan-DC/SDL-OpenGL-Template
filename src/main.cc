@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <float.h>
 
 #include "glad.h"
 
@@ -60,6 +61,39 @@ static void gltf_parse_meshes(const cgltf_data* gltf);
 static void gltf_parse_nodes(const cgltf_data* gltf);
 */
 
+void gui_transform(nk_context* ctx, const char* name, mat4 transform) {
+	nk_layout_row_dynamic(ctx, 25, 1);
+	nk_label(ctx, name, NK_TEXT_LEFT);
+	nk_layout_row_dynamic(ctx, 25, 3);
+	float scale[4];
+	mat4_getScale(transform, scale);
+
+	float rotation[4];
+	mat4_getEuler(transform, rotation);
+	rotation[0] = DEG(rotation[0]);
+	rotation[1] = DEG(rotation[1]);
+	rotation[2] = DEG(rotation[2]);
+
+	float position[4];
+	mat4_getPosition(transform, position); 
+	
+	// TODO: Convert rotation and position to world space
+
+	nk_property_float(ctx, "#x:", FLT_MIN, &position[0], FLT_MAX, 1.0f, 0.2f);
+	nk_property_float(ctx, "#y:", FLT_MIN, &position[1], FLT_MAX, 1.0f, 0.2f);
+	nk_property_float(ctx, "#z:", FLT_MIN, &position[2], FLT_MAX, 1.0f, 0.2f);
+
+	nk_property_float(ctx, "#rx:", .0, &rotation[0], 360., 1.0f, 0.2f);
+	nk_property_float(ctx, "#ry:", .0, &rotation[1], 360., 1.0f, 0.2f);
+	nk_property_float(ctx, "#rz:", .0, &rotation[2], 360., 1.0f, 0.2f);
+
+	nk_property_float(ctx, "#sx:", FLT_MIN, &scale[0], FLT_MAX, 1.0f, 0.2f);
+	nk_property_float(ctx, "#sy:", FLT_MIN, &scale[1], FLT_MAX, 1.0f, 0.2f);
+	nk_property_float(ctx, "#sz:", FLT_MIN, &scale[2], FLT_MAX, 1.0f, 0.2f);
+
+	//mat4_scale(transform, scale[0], scale[1], scale[2]);
+}
+
 void resize_window(SDL_Window* window, int window_width, int window_height) {
     SDL_SetWindowSize(window, window_width, window_height);
     glViewport(0, 0, window_width, window_height);
@@ -94,7 +128,6 @@ void camera_handle_input(camera_t* camera, double dt) {
 			camera->pitch = 89.0f;
 		if (camera->pitch < -89.0f)
 			camera->pitch = -89.0f;
-
 	}
 
 	// Movement
@@ -304,7 +337,7 @@ int main(int argc, char* argv[]) {
 
 	// camera
 	camera_t camera;
-	camera_new(&camera, PERSPECTIVE, 60., (float)width / (float)height);
+	camera_new(&camera, PERSPECTIVE, 60., (float)width / (float)height, .001, 1000.);
 	float pos[4] = {.0, .0, .0, 1.};
 	camera_set_pos(&camera, pos);
 	//camera_look_at(&camera, camera.camera_front);
@@ -551,6 +584,11 @@ int main(int argc, char* argv[]) {
 					char cam_front_label[64];
 					snprintf(cam_front_label, 64, "x:%.2f,y:%.2f,z:%.2f\0", camera.camera_front[0], camera.camera_front[1], camera.camera_front[2]);
 					nk_label(ctx, cam_front_label, NK_TEXT_LEFT);
+				}
+
+				nk_layout_row_static(ctx, 30, 200, 1);
+				{
+					gui_transform(ctx, "Camera View Matrix", camera.view_matrix);
 				}
 	        }
 	        nk_end(ctx);

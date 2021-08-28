@@ -115,6 +115,11 @@ enum camera_type {
 struct camera_t {
 	float view_matrix[16];
 	float projection_matrix[16];
+
+	float fov;
+	float aspect;
+	float near;
+	float far;
 	float camera_pos[4];
 	float camera_front[4];
 	float camera_up[4];
@@ -124,14 +129,18 @@ struct camera_t {
 	enum camera_type type;
 };
 
-int camera_new(camera_t *camera, enum camera_type type, float fov, float aspect) {
+int camera_new(camera_t *camera, enum camera_type type, float fov, float aspect, float near, float far) {
 	// fov: field of view, in degrees
 	// aspect: width / height of viewport
 	camera->type = type;
+	camera->fov = fov;
+	camera->aspect = aspect;
+	camera->near = near;
+	camera->far = far;
 	if (type == PERSPECTIVE) {
-		mat4_perspective(camera->projection_matrix, .001f, 1000.f, fov * (float) M_PI / 180.f, aspect);
+		mat4_perspective(camera->projection_matrix, camera->near, camera->far, RAD(camera->fov), camera->aspect);
 	} else {
-		mat4_orthographic(camera->projection_matrix, -1.0, 1.0, 1.0, -1.0, .01f, 100.f);
+		mat4_orthographic(camera->projection_matrix, -1.0, 1.0, 1.0, -1.0, .01f, camera->far);
 	}
     mat4_identity(camera->view_matrix);
     camera->camera_front[0] = .0;
@@ -183,6 +192,13 @@ void camera_update_matrices(camera_t* camera) {
 	camera->view_matrix[12] = camera->camera_pos[0];
 	camera->view_matrix[13] = camera->camera_pos[1];
 	camera->view_matrix[14] = camera->camera_pos[2];
+
+	if (camera->type == PERSPECTIVE) {
+		mat4_perspective(camera->projection_matrix, camera->near, camera->far, RAD(camera->fov), camera->aspect);
+	}
+	else {
+		mat4_orthographic(camera->projection_matrix, -1.0, 1.0, 1.0, -1.0, .01f, camera->far);
+	}
 }
 
 void camera_look_at(camera_t *camera, vec3 pos) {

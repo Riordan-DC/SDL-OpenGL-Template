@@ -560,6 +560,50 @@ MAF void mat4_getAngleAxis(mat4 m, float* angle, float* ax, float* ay, float* az
   *az = axis[2];
 }
 
+/*
+m[0] = m11
+m[1] = m21
+m[2] = m31
+m[3] = m41
+
+m[4] = m12
+m[5] = m22
+m[6] = m32
+m[7] = m42
+
+m[8] = m13
+m[9] = m23
+m[10] = m33
+m[11] = m43
+
+m[12] = m14
+m[13] = m24
+m[14] = m34
+m[15] = m44
+*/
+MAF void mat4_getEuler(mat4 m, vec3 euler) {
+    float sy = vec3_length(m + 4);
+
+    bool singular = sy < 1e-6; // If
+
+    float x, y, z;
+    if (!singular)
+    {
+        x = atan2(m[6], m[10]);
+        y = atan2(-m[2], sy);
+        z = atan2(m[1], m[0]);
+    }
+    else
+    {
+        x = atan2(-m[9], m[5]);
+        y = atan2(-m[2], sy);
+        z = 0;
+    }
+    euler[0] = x;
+    euler[1] = y;
+    euler[2] = z;
+}
+
 MAF void mat4_getScale(mat4 m, vec3 scale) {
   vec3_set(scale, vec3_length(m + 0), vec3_length(m + 4), vec3_length(m + 8));
 }
