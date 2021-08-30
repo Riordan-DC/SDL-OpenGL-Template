@@ -837,31 +837,6 @@ MAF void mat4_transformDirection(mat4 m, vec3 v) {
   v[3] = w;
 }
 
-
-
-MAF void angleAxis_toEuler(vec3 axis, float angle, float *yaw, float *pitch, float *roll) {
-    vec3_normalize(axis);
-    float x = axis[0], y = axis[1], z = axis[2];
-    double s = sinf(angle);
-    double c = cosf(angle);
-    double t = 1. - c;
-
-    if ((x * y * t + z * s) > 0.998) { // north pole singularity detected
-        *yaw = 2. * atan2f(x * sin(angle / 2.), cos(angle / 2.));
-        *pitch = M_PI / 2.;
-        *roll = .0;
-        return;
-    }
-    if ((x * y * t + z * s) < -0.998) { // south pole singularity detected
-        *yaw = -2. * atan2f(x * sin(angle / 2), cos(angle / 2));
-        *pitch = -M_PI / 2.;
-        *roll = .0;
-        return;
-    }
-    *yaw = atan2f(y * s - x * z * t, 1. - (y * y + z * z) * t);
-    *pitch = asinf(x * y * t + z * s);
-    *roll = atan2f(x * s - y * z * t, 1. - (x * x + z * z) * t);
-}
 /* mat4 format
 m[0] = m11
 m[1] = m21
@@ -921,7 +896,7 @@ MAF void mat4_fromEuler(mat4 m, float yaw, float pitch, float roll) {
     mat4_init(m, xmat);
 }
 
-MAF void mat4_rotate_euler(mat4 m, float yaw, float pitch, float roll) {
+MAF void mat4_rotate_euler(mat4 m, float yaw, float pitch, float roll) { // untested
     float mat_rot[16];
     mat4_fromEuler(mat_rot, yaw, pitch, roll);
     mat4_mul(m, mat_rot);

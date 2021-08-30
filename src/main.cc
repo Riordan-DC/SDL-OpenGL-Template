@@ -66,23 +66,30 @@ void gui_transform(nk_context* ctx, const char* name, mat4 transform) {
 	nk_layout_row_dynamic(ctx, 25, 1);
 	nk_label(ctx, name, NK_TEXT_LEFT);
 	nk_layout_row_dynamic(ctx, 25, 3);
-	
-	// experiment: checking mat -> euler -> mat works
-	float rot_mat_b[16];
-	//mat4_fromEuler(rot_mat_a, RAD(5.), .0, .0);
 
+	float position[4];
+	mat4_getPosition(transform, position);
+	float scale[4];
+	mat4_getScale(transform, scale);
+	// Remove scale to allow rotation to work
+	mat4_scale(transform, 1./scale[0], 1./scale[1], 1./scale[2]);
 	float yaw, pitch, roll;
 	mat4_toEuler(transform, &yaw, &pitch, &roll);
+
+
+	// Rotation
+	// This took forever because the floating point error which accumulated every frame.
+	float rot_mat_b[16];
 	float oyaw=yaw, opitch=pitch, oroll=roll;
 	yaw = DEG(yaw);
 	pitch = DEG(pitch);
 	roll = DEG(roll);
 
-	float rotation_min = 0.0;
-	float rotation_max = 45.0;
-	nk_property_float(ctx, "yaw", rotation_min, &yaw, rotation_max, .01f, 0.02f);
-	nk_property_float(ctx, "pitch", rotation_min, &pitch, rotation_max, .01f, 0.02f);
-	nk_property_float(ctx, "roll", rotation_min, &roll, rotation_max, .01f, 0.02f);
+	float rotation_min = -180.0;
+	float rotation_max = 180.0;
+	nk_property_float(ctx, "RX", rotation_min, &yaw, rotation_max, .01f, 0.02f);
+	nk_property_float(ctx, "RY", rotation_min, &pitch, rotation_max, .01f, 0.02f);
+	nk_property_float(ctx, "RZ", rotation_min, &roll, rotation_max, .01f, 0.02f);
 	yaw = RAD(yaw);
 	pitch = RAD(pitch);
 	roll = RAD(roll);
@@ -99,7 +106,24 @@ void gui_transform(nk_context* ctx, const char* name, mat4 transform) {
 	else {
 		mat4_init(transform, rot_mat_b);
 	}
-	// TEST: rot_mat_a == rot_mat_b
+
+	// Position
+	float position_min = -99999.0;
+	float position_max = 99999.0;
+	nk_property_float(ctx, "PX", position_min, &position[0], position_max, .01f, 0.02f);
+	nk_property_float(ctx, "PY", position_min, &position[1], position_max, .01f, 0.02f);
+	nk_property_float(ctx, "PZ", position_min, &position[2], position_max, .01f, 0.02f);
+	transform[12] = position[0];
+	transform[13] = position[1];
+	transform[14] = position[2];
+
+	// Scale (this may mess with rotation...)
+	float scale_min = -99999.0;
+	float scale_max = 99999.0;
+	nk_property_float(ctx, "SX", scale_min, &scale[0], scale_max, .01f, 0.02f);
+	nk_property_float(ctx, "SY", scale_min, &scale[1], scale_max, .01f, 0.02f);
+	nk_property_float(ctx, "SZ", scale_min, &scale[2], scale_max, .01f, 0.02f);
+	mat4_scale(transform, scale[0], scale[1], scale[2]);
 }
 
 void resize_window(SDL_Window* window, int window_width, int window_height) {
@@ -354,10 +378,6 @@ int main(int argc, char* argv[]) {
     float model[16];
     mat4_identity(model);
 	mat4_translate(model, .0, -0.3, .0);
-
-	float test_transform[16];
-	mat4_identity(test_transform);
-	mat4_fromEuler(test_transform, RAD(1.), RAD(5.), RAD(10.));
 	
 	// main loop 
 	int64_t accumulator = 0;
