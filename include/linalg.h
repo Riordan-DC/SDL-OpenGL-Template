@@ -17,6 +17,8 @@
 #define M_PI 3.14159265358979
 #endif
 
+#define CMP_EPSILON 0.00001
+
 typedef float* vec3;
 typedef float* quat;
 typedef float* mat4;
@@ -141,6 +143,65 @@ MAF quat quat_set(quat q, float x, float y, float z, float w) {
 
 MAF quat quat_init(quat q, const quat r) {
   return quat_set(q, r[0], r[1], r[2], r[3]);
+}
+
+MAF void quat_fromEuler(quat q, float yaw, float pitch, float roll) {
+    float qx = sinf(roll / 2.) * cosf(pitch / 2.) * cosf(yaw / 2.) - cosf(roll / 2.) * sinf(pitch / 2.) * sinf(yaw / 2.);
+    float qy = cosf(roll / 2.) * sinf(pitch / 2.) * cosf(yaw / 2.) + sinf(roll / 2.) * cosf(pitch / 2.) * sinf(yaw / 2.);
+    float qz = cosf(roll / 2.) * cosf(pitch / 2.) * sinf(yaw / 2.) - sinf(roll / 2.) * sinf(pitch / 2.) * cosf(yaw / 2.);
+    float qw = cosf(roll / 2.) * cosf(pitch / 2.) * cosf(yaw / 2.) + sinf(roll / 2.) * sinf(pitch / 2.) * sinf(yaw / 2.);
+    q[0] = qx;
+    q[1] = qy;
+    q[2] = qz;
+    q[3] = qw;
+}
+
+MAF void quat_toEuler(quat q, float *yaw, float *pitch, float *roll) {
+    float x = q[0], y = q[1], z = q[2], w = q[3];
+    float t0 = +2.0 * (w * x + y * z);
+    float t1 = +1.0 - 2.0 * (x * x + y * y);
+    *roll = atan2f(t0, t1);
+    float t2 = 2.0 * (w * y - z * x);
+    t2 = t2 > 1.0  ? 1.0 : t2;
+    t2 = t2 < -1.0  ? -1.0 : t2;
+    *pitch = asinf(t2);
+    float t3 = +2.0 * (w * z + x * y);
+    float t4 = +1.0 - 2.0 * (y * y + z * z);
+    *yaw = atan2f(t3, t4);
+}
+
+// https://www.euclideanspace.com/maths/geometry/rotations/conversions/eulerToAngle/
+MAF void euler_toAxisAngle(float yaw, float pitch, float roll, vec3 axis, float *angle) {
+    // Assuming the angles are in radians
+    float c1 = cosf(yaw / 2.);
+    float s1 = sinf(yaw / 2.);
+    float c2 = cosf(pitch / 2.);
+    float s2 = sinf(pitch / 2.);
+    float c3 = cosf(roll / 2.);
+    float s3 = sinf(roll / 2.);
+    float c1c2 = c1 * c2;
+    float s1s2 = s1 * s2;
+    float w = c1c2 * c3 - s1s2 * s3;
+    float x = c1c2 * s3 + s1s2 * c3;
+    float y = s1 * c2 * c3 + c1 * s2 * s3;
+    float z = c1 * s2 * c3 - s1 * c2 * s3;
+    *angle = 2. * acosf(w);
+    float norm = x * x + y * y + z * z;
+    if (norm < 0.001) { // when all euler angles are zero angle =0 so
+        // we can set axis to anything to avoid divide by zero
+        x = 1;
+        y = z = 0.;
+    }
+    else {
+        norm = sqrt(norm);
+        x /= norm;
+        y /= norm;
+        z /= norm;
+    }
+    axis[0] = x;
+    axis[1] = y;
+    axis[2] = z;
+    axis[3] = w;
 }
 
 MAF quat quat_fromAngleAxis(quat q, float angle, float ax, float ay, float az) {
@@ -560,7 +621,7 @@ MAF void mat4_getAngleAxis(mat4 m, float* angle, float* ax, float* ay, float* az
   *az = axis[2];
 }
 
-/*
+/* mat4 format
 m[0] = m11
 m[1] = m21
 m[2] = m31
@@ -582,19 +643,16 @@ m[14] = m34
 m[15] = m44
 */
 MAF void mat4_getEuler(mat4 m, vec3 euler) {
-    float sy = vec3_length(m + 4);
+    float sy = sqrt(m[0] * m[0] + m[1] * m[1]);
 
-    bool singular = sy < 1e-6; // If
+    bool singular = sy < 1e-6; 
 
     float x, y, z;
-    if (!singular)
-    {
+    if (!singular) {
         x = atan2(m[6], m[10]);
         y = atan2(-m[2], sy);
         z = atan2(m[1], m[0]);
-    }
-    else
-    {
+    } else {
         x = atan2(-m[9], m[5]);
         y = atan2(-m[2], sy);
         z = 0;
@@ -623,6 +681,27 @@ MAF mat4 mat4_orthographic(mat4 m, float left, float right, float top, float bot
   return m;
 }
 
+/* mat4 format
+m[0] = m11
+m[1] = m21
+m[2] = m31
+m[3] = m41
+
+m[4] = m12
+m[5] = m22
+m[6] = m32
+m[7] = m42
+
+m[8] = m13
+m[9] = m23
+m[10] = m33
+m[11] = m43
+
+m[12] = m14
+m[13] = m24
+m[14] = m34
+m[15] = m44
+*/
 MAF mat4 mat4_perspective(mat4 m, float clipNear, float clipFar, float fovy, float aspect) {
   float range = tanf(fovy * .5f) * clipNear;
   float sx = (2.f * clipNear) / (range * aspect + range * aspect);
@@ -757,5 +836,156 @@ MAF void mat4_transformDirection(mat4 m, vec3 v) {
   v[2] = z;
   v[3] = w;
 }
+
+
+
+MAF void angleAxis_toEuler(vec3 axis, float angle, float *yaw, float *pitch, float *roll) {
+    vec3_normalize(axis);
+    float x = axis[0], y = axis[1], z = axis[2];
+    double s = sinf(angle);
+    double c = cosf(angle);
+    double t = 1. - c;
+
+    if ((x * y * t + z * s) > 0.998) { // north pole singularity detected
+        *yaw = 2. * atan2f(x * sin(angle / 2.), cos(angle / 2.));
+        *pitch = M_PI / 2.;
+        *roll = .0;
+        return;
+    }
+    if ((x * y * t + z * s) < -0.998) { // south pole singularity detected
+        *yaw = -2. * atan2f(x * sin(angle / 2), cos(angle / 2));
+        *pitch = -M_PI / 2.;
+        *roll = .0;
+        return;
+    }
+    *yaw = atan2f(y * s - x * z * t, 1. - (y * y + z * z) * t);
+    *pitch = asinf(x * y * t + z * s);
+    *roll = atan2f(x * s - y * z * t, 1. - (x * x + z * z) * t);
+}
+/* mat4 format
+m[0] = m11
+m[1] = m21
+m[2] = m31
+m[3] = m41
+
+m[4] = m12
+m[5] = m22
+m[6] = m32
+m[7] = m42
+
+m[8] = m13
+m[9] = m23
+m[10] = m33
+m[11] = m43
+
+m[12] = m14
+m[13] = m24
+m[14] = m34
+m[15] = m44
+*/
+MAF void mat4_fromEuler(mat4 m, float yaw, float pitch, float roll) {
+    float x=yaw, y=pitch, z=roll, c, s;
+    c = cosf(x);
+    s = sinf(x);
+    float xmat[16];
+    mat4_identity(xmat);
+    xmat[0] = 1.0;
+    xmat[5] = c;
+    xmat[10] = c;
+    xmat[6] = s;
+    xmat[9] = -s;
+
+    c = cosf(y);
+    s = sinf(y);
+    float ymat[16];
+    mat4_identity(ymat);
+    ymat[0] = c;
+    ymat[2] = -s;
+    ymat[5] = 1.0;
+    ymat[8] = s;
+    ymat[10] = c;
+
+    c = cosf(z);
+    s = sinf(z);
+    float zmat[16];
+    mat4_identity(zmat);
+    zmat[0] = c;
+    zmat[1] = s;
+    zmat[4] = -s;
+    zmat[5] = c;
+    zmat[10] = 1.0;
+
+    //optimizer will optimize away all this anyway
+    //*this = xmat * (ymat * zmat);
+    mat4_mul(xmat, mat4_mul(ymat, zmat));
+    mat4_init(m, xmat);
+}
+
+MAF void mat4_rotate_euler(mat4 m, float yaw, float pitch, float roll) {
+    float mat_rot[16];
+    mat4_fromEuler(mat_rot, yaw, pitch, roll);
+    mat4_mul(m, mat_rot);
+}
+
+MAF void mat4_toEuler(mat4 m, float *yaw, float *pitch, float *roll) {
+    // Euler angles in XYZ convention.
+    // See https://en.wikipedia.org/wiki/Euler_angles#Rotation_matrix
+    //
+    // rot =  cy*cz          -cy*sz           sy
+    //        cz*sx*sy+cx*sz  cx*cz-sx*sy*sz -cy*sx
+    //       -cx*cz*sy+sx*sz  cz*sx+cx*sy*sz  cx*cy
+    float x, y, z;
+    float sy = m[8];
+    if (sy < (1.0 - CMP_EPSILON)) {
+        if (sy > -(1.0 - CMP_EPSILON)) {
+            // is this a pure Y rotation?
+            if (m[1] == 0.0 && m[4] == 0.0 && m[9] == 0 && m[6] == 0 && m[5] == 1) {
+                // return the simplest form (human friendlier in editor and scripts)
+                x = 0;
+                y = atan2(m[8], m[0]);
+                z = 0;
+            }
+            else {
+                x = atan2(-m[9], m[10]);
+                y = asin(sy);
+                z = atan2(-m[4], m[0]);
+            }
+        }
+        else {
+            x = atan2(m[6], m[5]);
+            y = -M_PI / 2.0;
+            z = 0.0;
+        }
+    }
+    else {
+        x = atan2(m[6], m[5]);
+        y = M_PI / 2.0;
+        z = 0.0;
+    }
+    *yaw = x;
+    *pitch = y;
+    *roll = z;
+}
+
+MAF int mat4_equalMat4(mat4 m, mat4 n) {
+    if (fabsf(m[0] - n[0]) > CMP_EPSILON) return 0;
+    if (fabsf(m[1] - n[1]) > CMP_EPSILON) return 0;
+    if (fabsf(m[2] - n[2]) > CMP_EPSILON) return 0;
+    if (fabsf(m[3] - n[3]) > CMP_EPSILON) return 0;
+    if (fabsf(m[4] - n[4]) > CMP_EPSILON) return 0;
+    if (fabsf(m[5] - n[5]) > CMP_EPSILON) return 0;
+    if (fabsf(m[6] - n[6]) > CMP_EPSILON) return 0;
+    if (fabsf(m[7] - n[7]) > CMP_EPSILON) return 0;
+    if (fabsf(m[8] - n[8]) > CMP_EPSILON) return 0;
+    if (fabsf(m[9] - n[9]) > CMP_EPSILON) return 0;
+    if (fabsf(m[10] - n[10]) > CMP_EPSILON) return 0;
+    if (fabsf(m[11] - n[11]) > CMP_EPSILON) return 0;
+    if (fabsf(m[12] - n[12]) > CMP_EPSILON) return 0;
+    if (fabsf(m[13] - n[13]) > CMP_EPSILON) return 0;
+    if (fabsf(m[14] - n[14]) > CMP_EPSILON) return 0;
+    if (fabsf(m[15] - n[15]) > CMP_EPSILON) return 0;
+    return 1;
+}
+
 
 #endif

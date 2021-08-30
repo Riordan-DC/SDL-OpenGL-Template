@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <float.h>
+#include <math.h>
 
 #include "glad.h"
 
@@ -65,33 +66,40 @@ void gui_transform(nk_context* ctx, const char* name, mat4 transform) {
 	nk_layout_row_dynamic(ctx, 25, 1);
 	nk_label(ctx, name, NK_TEXT_LEFT);
 	nk_layout_row_dynamic(ctx, 25, 3);
-	float scale[4];
-	mat4_getScale(transform, scale);
-
-	float rotation[4];
-	mat4_getEuler(transform, rotation);
-	rotation[0] = DEG(rotation[0]);
-	rotation[1] = DEG(rotation[1]);
-	rotation[2] = DEG(rotation[2]);
-
-	float position[4];
-	mat4_getPosition(transform, position); 
 	
-	// TODO: Convert rotation and position to world space
+	// experiment: checking mat -> euler -> mat works
+	float rot_mat_b[16];
+	//mat4_fromEuler(rot_mat_a, RAD(5.), .0, .0);
 
-	nk_property_float(ctx, "#x:", FLT_MIN, &position[0], FLT_MAX, 1.0f, 0.2f);
-	nk_property_float(ctx, "#y:", FLT_MIN, &position[1], FLT_MAX, 1.0f, 0.2f);
-	nk_property_float(ctx, "#z:", FLT_MIN, &position[2], FLT_MAX, 1.0f, 0.2f);
+	float yaw, pitch, roll;
+	mat4_toEuler(transform, &yaw, &pitch, &roll);
+	float oyaw=yaw, opitch=pitch, oroll=roll;
+	yaw = DEG(yaw);
+	pitch = DEG(pitch);
+	roll = DEG(roll);
 
-	nk_property_float(ctx, "#rx:", .0, &rotation[0], 360., 1.0f, 0.2f);
-	nk_property_float(ctx, "#ry:", .0, &rotation[1], 360., 1.0f, 0.2f);
-	nk_property_float(ctx, "#rz:", .0, &rotation[2], 360., 1.0f, 0.2f);
+	float rotation_min = 0.0;
+	float rotation_max = 45.0;
+	nk_property_float(ctx, "yaw", rotation_min, &yaw, rotation_max, .01f, 0.02f);
+	nk_property_float(ctx, "pitch", rotation_min, &pitch, rotation_max, .01f, 0.02f);
+	nk_property_float(ctx, "roll", rotation_min, &roll, rotation_max, .01f, 0.02f);
+	yaw = RAD(yaw);
+	pitch = RAD(pitch);
+	roll = RAD(roll);
 
-	nk_property_float(ctx, "#sx:", FLT_MIN, &scale[0], FLT_MAX, 1.0f, 0.2f);
-	nk_property_float(ctx, "#sy:", FLT_MIN, &scale[1], FLT_MAX, 1.0f, 0.2f);
-	nk_property_float(ctx, "#sz:", FLT_MIN, &scale[2], FLT_MAX, 1.0f, 0.2f);
-
-	//mat4_scale(transform, scale[0], scale[1], scale[2]);
+	yaw = fabsf(yaw - oyaw) > CMP_EPSILON ? yaw : oyaw;
+	pitch = fabsf(pitch - opitch) > CMP_EPSILON ? pitch : opitch;
+	roll = fabsf(roll - oroll) > CMP_EPSILON ? roll : oroll;
+	mat4_fromEuler(rot_mat_b, yaw, pitch, roll);
+	int equal = mat4_equalMat4(transform, rot_mat_b);
+	roy_log(LOG_INFO, "GUI", "matracies equal = %d", equal);
+	if (equal) {
+		// do nothing
+	}
+	else {
+		mat4_init(transform, rot_mat_b);
+	}
+	// TEST: rot_mat_a == rot_mat_b
 }
 
 void resize_window(SDL_Window* window, int window_width, int window_height) {
@@ -346,6 +354,10 @@ int main(int argc, char* argv[]) {
     float model[16];
     mat4_identity(model);
 	mat4_translate(model, .0, -0.3, .0);
+
+	float test_transform[16];
+	mat4_identity(test_transform);
+	mat4_fromEuler(test_transform, RAD(1.), RAD(5.), RAD(10.));
 	
 	// main loop 
 	int64_t accumulator = 0;
@@ -480,7 +492,7 @@ int main(int argc, char* argv[]) {
 	        mat4_identity(mvp);
 
 	        //mat4_rotate(model, 100. * dt * (float) M_PI / 180.f,.0,1.,.0);
-
+			
 	        mat4_mul(mvp, camera.projection_matrix);
 			mat4_mul(mvp, camera.view_matrix);
 			mat4_mul(mvp, model);
@@ -518,7 +530,7 @@ int main(int argc, char* argv[]) {
 	        canvas_end(ctx, &canvas);
 	        
 
-	        if (nk_begin(ctx, "Roy Scene", nk_rect(10, 40, 220, 3*220),
+	        if (nk_begin(ctx, "Roy Scene", nk_rect(10, 40, 350, 3*220),
 	            NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE)) { // NK_WINDOW_CLOSABLE | NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_SCALE_LEFT
 	            /* fixed widget pixel width */
 	            nk_layout_row_static(ctx, 30, 80, 1);
@@ -588,8 +600,42 @@ int main(int argc, char* argv[]) {
 
 				nk_layout_row_static(ctx, 30, 200, 1);
 				{
-					gui_transform(ctx, "Camera View Matrix", camera.view_matrix);
+					gui_transform(ctx, "test Matrix", model);
 				}
+
+				/* complex color combobox */
+				static struct nk_color combo_color = { 130, 50, 50, 255 };
+				static struct nk_colorf combo_color2 = { 0.509f, 0.705f, 0.2f, 1.0f };
+				if (nk_combo_begin_color(ctx, nk_rgb_cf(combo_color2), nk_vec2(200, 400))) {
+					enum color_mode { COL_RGB, COL_HSV };
+					static int col_mode = COL_RGB;
+
+					nk_layout_row_dynamic(ctx, 120, 1);
+					combo_color2 = nk_color_picker(ctx, combo_color2, NK_RGBA);
+
+					nk_layout_row_dynamic(ctx, 25, 2);
+					col_mode = nk_option_label(ctx, "RGB", col_mode == COL_RGB) ? COL_RGB : col_mode;
+					col_mode = nk_option_label(ctx, "HSV", col_mode == COL_HSV) ? COL_HSV : col_mode;
+
+					nk_layout_row_dynamic(ctx, 25, 1);
+					if (col_mode == COL_RGB) {
+						combo_color2.r = nk_propertyf(ctx, "#R:", 0, combo_color2.r, 1.0f, 0.01f, 0.005f);
+						combo_color2.g = nk_propertyf(ctx, "#G:", 0, combo_color2.g, 1.0f, 0.01f, 0.005f);
+						combo_color2.b = nk_propertyf(ctx, "#B:", 0, combo_color2.b, 1.0f, 0.01f, 0.005f);
+						combo_color2.a = nk_propertyf(ctx, "#A:", 0, combo_color2.a, 1.0f, 0.01f, 0.005f);
+					}
+					else {
+						float hsva[4];
+						nk_colorf_hsva_fv(hsva, combo_color2);
+						hsva[0] = nk_propertyf(ctx, "#H:", 0, hsva[0], 1.0f, 0.01f, 0.05f);
+						hsva[1] = nk_propertyf(ctx, "#S:", 0, hsva[1], 1.0f, 0.01f, 0.05f);
+						hsva[2] = nk_propertyf(ctx, "#V:", 0, hsva[2], 1.0f, 0.01f, 0.05f);
+						hsva[3] = nk_propertyf(ctx, "#A:", 0, hsva[3], 1.0f, 0.01f, 0.05f);
+						combo_color2 = nk_hsva_colorfv(hsva);
+					}
+					nk_combo_end(ctx);
+				}
+
 	        }
 	        nk_end(ctx);
 
