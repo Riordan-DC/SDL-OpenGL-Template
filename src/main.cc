@@ -39,15 +39,21 @@
 	#ifdef __BULLET__
 		//#include "btBulletCollisionCommon.h"
 		#include "btBulletDynamicsCommon.h"
+		#include "BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h"
 	#endif
 
+	#ifdef __STB_IMAGE__
+		#define STB_IMAGE_IMPLEMENTATION
+		#define STBI_FAILURE_USERMSG 
+		#include "stb_image.h"
+	#endif
 #endif
 
 #include "opengl.h"
 #include "shader.h"
 #include "util.h"
 #include "gl.h"
-
+#include "editor.hpp"
 
 SDL_Window* window;
 SDL_GLContext* gl_context;
@@ -99,7 +105,6 @@ void gui_transform(nk_context* ctx, const char* name, mat4 transform) {
 	roll = fabsf(roll - oroll) > CMP_EPSILON ? roll : oroll;
 	mat4_fromEuler(rot_mat_b, yaw, pitch, roll);
 	int equal = mat4_equalMat4(transform, rot_mat_b);
-	roy_log(LOG_INFO, "GUI", "matracies equal = %d", equal);
 	if (equal) {
 		// do nothing
 	}
@@ -209,12 +214,11 @@ int main(int argc, char* argv[]) {
 	gl_context = new_SDL_GLContext(
 		window, 
 		1200, 800, 
-		4, 6, // OpenGL major, minor version
+		3, 1, // OpenGL major, minor version (4.6) (3.1 for bullet debug)
 		4, 1);
 
 	glEnable(GL_DEPTH_TEST);
 
-/*
 	// Build the broadphase
 	btBroadphaseInterface* broadphase = new btDbvtBroadphase();
 
@@ -227,7 +231,56 @@ int main(int argc, char* argv[]) {
 
 	// The world.
 	btDiscreteDynamicsWorld* dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
-*/
+
+	btDebugDraw* debug_drawer = new btDebugDraw();
+	debug_drawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb); // Wireframe + AABB  | btIDebugDraw::DBG_FastWireframe
+	dynamicsWorld->setDebugDrawer(debug_drawer);
+	SDL_Surface* mapdata = SDL_LoadBMP("testmap.bmp");
+	int mwidth = mapdata->w, mlength = mapdata->h;
+	roy_assert(mwidth != 0 && mwidth != 0, "Terrain heightmap failed to load image data");
+	
+	float stroke_scale = 1.0f;
+	float height_scale = 10.0f;
+	float min_height = -10.0f;
+	float max_height = 10.0f;
+	// Scale heightmap data
+	uint8_t pixel_size = mapdata->format->BytesPerPixel;
+	SDL_LockSurface(mapdata);
+	float* raw_heightfield_data = (float*)malloc(sizeof(float) * mwidth * mlength);
+	for (int i = 0; i < (mwidth * mlength); i++) {
+		// get grey value
+		unsigned char grey_val;
+
+		SDL_Color* color;
+		/* Check the bitdepth of the surface */
+		roy_assert(mapdata->format->BitsPerPixel != 8, "Not an 8-bit surface. (uint8_t wont work) \n");
+		//mapdata->pixels[(y * mapdata->pitch) + x * mapdata->format->BytesPerPixel];
+		uint8_t* pixel = (uint8_t*)mapdata->pixels + i * mapdata->format->BytesPerPixel;
+		uint8_t r = pixel[0], g = pixel[1], b = pixel[2];
+		raw_heightfield_data[i] = ((float)r / 255.0f) * height_scale;
+	}
+	SDL_UnlockSurface(mapdata);
+	SDL_FreeSurface(mapdata);
+	btHeightfieldTerrainShape* heightfield_shape = heightfield_shape =
+		new btHeightfieldTerrainShape(
+			mwidth, mlength,
+			raw_heightfield_data,
+			stroke_scale, 
+			min_height, max_height,
+			1, PHY_FLOAT, false);
+	roy_assert(heightfield_shape != NULL, "Terrain failed to initialise btHeightfieldTerrainShape");
+	heightfield_shape->setLocalScaling(btVector3(stroke_scale, 1.0, stroke_scale));
+	btTransform start_trans;
+	start_trans.setIdentity();
+	start_trans.setOrigin(btVector3(0, 0, 0));
+	// Using motionstate is optional, it provides interpolation capabilities, and only synchronizes 'active' objects
+	btDefaultMotionState* motion_state = new btDefaultMotionState(start_trans);
+	btRigidBody::btRigidBodyConstructionInfo rb_info(0.0f, motion_state, heightfield_shape, btVector3(0, 0, 0));
+	btRigidBody* body = new btRigidBody(rb_info);
+	dynamicsWorld->addRigidBody(body);
+
+	btVector3 dis = body->getCenterOfMassPosition();
+	roy_log(LOG_INFO, "BULLET", "COM Terrain %f,%f,%f", (float)dis.x(), (float)dis.y(), (float)dis.z());
 
 	// Load shaders
 	FILE* vertex_shader_file = fopen("shader/normal.vert", "rb");
@@ -249,7 +302,6 @@ int main(int argc, char* argv[]) {
 	shader_fragment_source[fragment_shader_size] = 0;
 
 	struct shader_t normal_shader;
-	shader_delete(&normal_shader);
 
 	shader_graphics_new(
 		&normal_shader, 
@@ -451,7 +503,6 @@ int main(int argc, char* argv[]) {
 				// Integrate current state
 				// FIXED UPDATE
 				//game->fixed_update(fixed_dt);
-				
 
 				if (consumed_dt > desired_frametime) { //cap variable update's dt to not be larger than fixed update, and interleave it (so game state can always get animation frames it needs)
 					// VARIABLE UPDATE
@@ -499,13 +550,20 @@ int main(int argc, char* argv[]) {
 	        nk_input_end(ctx);
 			camera_handle_input(&camera, dt);
 
-			// GRAPHICS
+
+			// Physics
+			dynamicsWorld->stepSimulation(
+				dt,						// Time since last step
+				1,								// Mas substep count (7)
+				btScalar(1.) / btScalar(60.));	// Fixed time step 
+
+			// Graphics Begin
 			//game->render(1.0, 1.0);
 			glViewport(0, 0, width, height);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-			// GRAPHICS
+			// Render
 	        gl_use_program(normal_shader.program);
 	        
 	        float mvp[16];
@@ -540,17 +598,19 @@ int main(int argc, char* argv[]) {
 			gl_use_program(0);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-			// GUI        
-			struct nk_canvas canvas;
-	        canvas_begin(ctx, &canvas, 0, 0, 0, width, 30, nk_rgb(100,100,100));
-	        {
-	            nk_draw_text(canvas.painter, nk_rect(0, 0, 150, 30), "Roy v0.1", 8, ctx->style.font, nk_rgb(188,174,118), nk_rgb(0,0,0));
-	            nk_draw_text(canvas.painter, nk_rect(70, 0, 200, 30), "<Scene Name>* (unsaved)", 23, ctx->style.font, nk_rgb(150,150,150), nk_rgb(0,0,0));
-	        }
-	        canvas_end(ctx, &canvas);
-	        
+			// Debug physics
+			mat4_identity(mvp);
+			float tm[16];
+			mat4_identity(tm);
+			mat4_mul(mvp, camera.projection_matrix);
+			mat4_mul(mvp, camera.view_matrix);
+			mat4_mul(mvp, tm);
+			mat4_init(debug_drawer->mvp, mvp);
+			dynamicsWorld->debugDrawWorld();
+			debug_drawer->drawLine(btVector3(.0, .0, .0), btVector3(.0, 1., .0), btVector3(1., .0, .0));
 
-	        if (nk_begin(ctx, "Roy Scene", nk_rect(10, 40, 350, 3*220),
+			// GUI        
+	        if (nk_begin(ctx, "Roy Scene", nk_rect(10, 40, 400, 3*220),
 	            NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE)) { // NK_WINDOW_CLOSABLE | NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_SCALE_LEFT
 	            /* fixed widget pixel width */
 	            nk_layout_row_static(ctx, 30, 80, 1);
@@ -572,22 +632,6 @@ int main(int argc, char* argv[]) {
 	                nk_slider_float(ctx, 0, &value, 1.0f, 0.01f);
 	            }
 	            nk_layout_row_end(ctx);
-	            
-	            nk_layout_row_static(ctx, 30, 100, 1);
-	            {
-		            static char text[3][64];
-		            static int text_len[3];
-	                nk_label(ctx, "Camera X:", NK_TEXT_LEFT);
-	                nk_edit_string(ctx, NK_EDIT_SIMPLE, text[0], &text_len[0], 64, nk_filter_float);
-	                nk_label(ctx, "Camera Y:", NK_TEXT_LEFT);
-	                nk_edit_string(ctx, NK_EDIT_SIMPLE, text[1], &text_len[1], 64, nk_filter_float);
-	                nk_label(ctx, "Camera Z:", NK_TEXT_LEFT);
-	                nk_edit_string(ctx, NK_EDIT_SIMPLE, text[2], &text_len[2], 64, nk_filter_float);
-	                if (text_len[0] > 0) camera.view_matrix[12] = (float)atof(text[0]);
-	                if (text_len[1] > 0) camera.view_matrix[13] = (float)atof(text[1]);
-	                if (text_len[2] > 0) camera.view_matrix[14] = (float)atof(text[2]);
-
-	            }
 
 	            nk_layout_row_static(ctx, 30, 180, 1);
 	            {
@@ -677,12 +721,6 @@ int main(int argc, char* argv[]) {
 				for (int i = 0; i < update_multiplicity; i++) {
 					// FIXED UPDATE
 					//game->fixed_update(fixed_dt);
-
-					// PHYSICS
-					//dynamicsWorld->stepSimulation(
-					//	0.01,						// Time since last step
-					//	7,								// Mas substep count
-					//	btScalar(1.) / btScalar(60.));	// Fixed time step 
 
 					// VARIABLE UPDATE
 					//game->variable_update(fixed_dt);

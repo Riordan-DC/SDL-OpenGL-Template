@@ -28,7 +28,15 @@ NK_API void                 nk_sdl_device_create(void);
 NK_API void canvas_end(struct nk_context *ctx, struct nk_canvas *canvas);
 NK_API void canvas_begin(struct nk_context *ctx, struct nk_canvas *canvas, nk_flags flags,
     int x, int y, int width, int height, struct nk_color background_color);
-
+/* Canvas Example
+struct nk_canvas canvas;
+canvas_begin(ctx, &canvas, 0, 0, 0, width, 30, nk_rgb(100,100,100));
+{
+    nk_draw_text(canvas.painter, nk_rect(0, 0, 150, 30), "Roy v0.1", 8, ctx->style.font, nk_rgb(188,174,118), nk_rgb(0,0,0));
+    nk_draw_text(canvas.painter, nk_rect(70, 0, 200, 30), "<Scene Name>* (unsaved)", 23, ctx->style.font, nk_rgb(150,150,150), nk_rgb(0,0,0));
+}
+canvas_end(ctx, &canvas);
+*/
 #endif
 
 /*

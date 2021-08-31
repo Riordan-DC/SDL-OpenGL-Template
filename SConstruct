@@ -14,13 +14,15 @@ vars.Add(EnumVariable('cgltf', 'Building cgltf module', 'yes', allowed_values=('
 vars.Add(EnumVariable('nuklear', 'Building nuklear module', 'yes', allowed_values=('yes', 'no')))
 # bullet
 vars.Add(EnumVariable('bullet', 'Building bullet module', 'yes', allowed_values=('yes', 'no')))
+# stb_image
+vars.Add(EnumVariable('stb_image', 'Building stb_image module', 'yes', allowed_values=('yes', 'no')))
 
 env = Environment(variables = vars)
 Help(vars.GenerateHelpText(env))
 
 system = platform.system()
 
-src_files = Glob('src/*.c') + Glob('src/*.cc')
+src_files = Glob('src/*.c') + Glob('src/*.cc') + Glob('src/*.cpp')
 INCLUDE = ["include"]
 name = "SDL-OpenGL-Project"
 bin = "build/bin/" + name
@@ -265,29 +267,6 @@ def get_bullet_source():
 if env['PLATFORM'] == 'win32':
     print('Windows Build')
     
-    
-    """
-    LIBS += [
-        'opengl32',
-        'kernel32',
-        'libucrtd', # d suffix is debug
-        'advapi32',
-        'comdlg32',
-        'gdi32',
-        'odbc32',
-        'odbccp32',
-        'ole32',
-        'oleaut32',
-        'shell32',
-        'user32',
-        'uuid',
-        'winspool',
-        'libvcruntime',
-        'msvcrtd', # d suffix is debug
-        #'libcmtd',
-        'libcpmtd',
-    ]
-    """
     LIBS += [ # d suffix is debug
         'opengl32', # OpenGL
         'kernel32', # Windows
@@ -297,12 +276,6 @@ if env['PLATFORM'] == 'win32':
         'msvcrtd', # C runtime startup
         'msvcprtd', # C++ standard
         'vcruntimed', # C++ runtime
-
-        # Static
-        #'libucrtd', # Universal C runtime
-        #'libcmtd', # C runtime startup
-        #'libcpmtd', # C++ standard
-        #'libvcruntime', # C++ runtime
 
         'advapi32',
         'comdlg32',
@@ -339,7 +312,7 @@ if env['PLATFORM'] == 'win32':
         #'/MACHINE:X64', #/MACHINE:{ARM|EBC|X64|X86}
         #'/NXCOMPAT',
         #'/DYNAMICBASE', # generate an executable image that's rebased at load time by using the address space layout randomization (ASLR) feature.
-        '/SUBSYSTEM:CONSOLE', #{BOOT_APPLICATION|CONSOLE|NATIVE|POSIX|WINDOWS}
+        '/SUBSYSTEM:CONSOLE', #{BOOT_APPLICATION|CONSOLE|NATIVE|POSIX|WINDOWS} Change to WINDOWS on release mode
         #'/NODEFAULTLIB',
     ]
 
@@ -377,6 +350,13 @@ if env['PLATFORM'] == 'win32':
         CPPDEFINES += [
             '__MODULES__'
         ]
+        if env['stb_image'] == 'yes':
+            CPPDEFINES += [
+                '__STB_IMAGE__'
+            ]
+            INCLUDE += [
+                'modules/stb_image/'
+            ]
         if env['cgltf'] == 'yes':
             CPPDEFINES += [
                 '__CGLTF__'
