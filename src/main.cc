@@ -171,41 +171,49 @@ void camera_handle_input(camera_t* camera, double dt) {
 	const Uint8 *state = SDL_GetKeyboardState(NULL);
 	float speed = 1.0 * (float)dt;
 	float pos[4] = {.0, .0, .0, 1.};
+	float front[4] = { .0, .0, .0, 1. };
+	front[0] = cos(RAD(camera->yaw)) * cos(RAD(camera->pitch));
+	front[1] = sin(RAD(camera->pitch));
+	front[2] = sin(RAD(camera->yaw)) * cos(RAD(camera->pitch));
+	vec3_normalize(front);
+	float world_up[4] = { .0, 1., .0, 1. };
+	float right[4] = { .0, .0, .0, 1. };
+	vec3_init(right, front);
+	vec3_cross(right, world_up);
+	vec3_normalize(right);
+	float up[4] = { .0, .0, .0, 1. };
+	vec3_init(up, right);
+	vec3_cross(up, front);
+	vec3_normalize(up);
 	if (state[SDL_SCANCODE_W]) { // forwards
 		float move_dir[4] = { .0, .0, .0, 1. };
-		vec3_init(move_dir, camera->camera_front);
+		vec3_init(move_dir, front);
 		vec3_scale(move_dir, speed);
 	    vec3_add(pos, move_dir);
 	}
 	if (state[SDL_SCANCODE_S]) { // backwards
 		float move_dir[4] = { .0, .0, .0, 1. };
-		vec3_init(move_dir, camera->camera_front);
+		vec3_init(move_dir, front);
 		vec3_scale(move_dir, speed);
 	    vec3_sub(pos, move_dir);
 	}
 	if (state[SDL_SCANCODE_A]) { // left
 		float move_dir[4] = { .0, .0, .0, 1. };
-		vec3_init(move_dir, camera->camera_front);
-		vec3_cross(move_dir, camera->camera_up);
+		vec3_init(move_dir, front);
+		vec3_cross(move_dir, up);
 		vec3_normalize(move_dir);
 		vec3_scale(move_dir, speed);
 	    vec3_sub(pos, move_dir);
 	}
 	if (state[SDL_SCANCODE_D]) { // right
 		float move_dir[4] = { .0, .0, .0, 1. };
-		vec3_init(move_dir, camera->camera_front);
-		vec3_cross(move_dir, camera->camera_up);
+		vec3_init(move_dir, front);
+		vec3_cross(move_dir, up);
 		vec3_normalize(move_dir);
 		vec3_scale(move_dir, speed);
 	    vec3_add(pos, move_dir);
 	}
-	camera_move(camera, pos);
-	camera_update_matrices(camera);
-
-	float look_dir[4] = { .0, .0, .0, 1. };
-	vec3_init(look_dir, camera->camera_pos);
-	vec3_add(look_dir, camera->camera_front);
-	camera_look_at(camera, look_dir);
+	vec3_add(camera->position, pos);
 }
 
 int main(int argc, char* argv[]) {
@@ -214,7 +222,7 @@ int main(int argc, char* argv[]) {
 	gl_context = new_SDL_GLContext(
 		window, 
 		1200, 800, 
-		3, 1, // OpenGL major, minor version (4.6) (3.1 for bullet debug)
+		4, 6, // OpenGL major, minor version (4.6) (3.1 for bullet debug)
 		4, 1);
 
 	glEnable(GL_DEPTH_TEST);
@@ -232,6 +240,7 @@ int main(int argc, char* argv[]) {
 	// The world.
 	btDiscreteDynamicsWorld* dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
 
+	bool debug_physics = false;
 	btDebugDraw* debug_drawer = new btDebugDraw();
 	debug_drawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb); // Wireframe + AABB  | btIDebugDraw::DBG_FastWireframe
 	dynamicsWorld->setDebugDrawer(debug_drawer);
@@ -421,10 +430,9 @@ int main(int argc, char* argv[]) {
 
 	// camera
 	camera_t camera;
-	camera_new(&camera, PERSPECTIVE, 60., (float)width / (float)height, .001, 1000.);
+	camera_new(&camera, PERSPECTIVE, 60., .001, 1000.);
 	float pos[4] = {.0, .0, .0, 1.};
-	camera_set_pos(&camera, pos);
-	//camera_look_at(&camera, camera.camera_front);
+	vec3_init(camera.position, pos);
 
 	// model pose
     float model[16];
@@ -566,13 +574,13 @@ int main(int argc, char* argv[]) {
 			// Render
 	        gl_use_program(normal_shader.program);
 	        
-	        float mvp[16];
+	        float mvp[16], projection[16], view[16];
 	        mat4_identity(mvp);
 
 	        //mat4_rotate(model, 100. * dt * (float) M_PI / 180.f,.0,1.,.0);
 			
-	        mat4_mul(mvp, camera.projection_matrix);
-			mat4_mul(mvp, camera.view_matrix);
+	        mat4_mul(mvp, camera_projection(projection, &camera, width, height));
+			mat4_mul(mvp, camera_view(view, &camera));
 			mat4_mul(mvp, model);
 
 			shader_set_uniform(&normal_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
@@ -597,25 +605,28 @@ int main(int argc, char* argv[]) {
 			glBindVertexArray(0);
 			gl_use_program(0);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
+			
 			// Debug physics
-			mat4_identity(mvp);
-			float tm[16];
-			mat4_identity(tm);
-			mat4_mul(mvp, camera.projection_matrix);
-			mat4_mul(mvp, camera.view_matrix);
-			mat4_mul(mvp, tm);
-			mat4_init(debug_drawer->mvp, mvp);
-			dynamicsWorld->debugDrawWorld();
-			debug_drawer->drawLine(btVector3(.0, .0, .0), btVector3(.0, 1., .0), btVector3(1., .0, .0));
+			if (debug_physics) {
+				mat4_identity(mvp);
+				float tm[16], projection[16], view[16];;
+				mat4_identity(tm);
+				mat4_mul(mvp, camera_projection(projection, &camera, width, height));
+				mat4_mul(mvp, camera_view(view, &camera));
+				mat4_mul(mvp, tm);
+				mat4_init(debug_drawer->mvp, mvp);
+				dynamicsWorld->debugDrawWorld();
+				debug_drawer->drawLine(btVector3(.0, .0, .0), btVector3(.0, 1., .0), btVector3(1., .0, .0));
+			}
 
 			// GUI        
 	        if (nk_begin(ctx, "Roy Scene", nk_rect(10, 40, 400, 3*220),
 	            NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE)) { // NK_WINDOW_CLOSABLE | NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_SCALE_LEFT
 	            /* fixed widget pixel width */
 	            nk_layout_row_static(ctx, 30, 80, 1);
-	            if (nk_button_label(ctx, "button")) {
+	            if (nk_button_label(ctx, "Physics Visualisation")) {
 	                /* event handling */
+					debug_physics = !debug_physics;
 	            }
 
 	            /* fixed widget window ratio width */
@@ -633,13 +644,6 @@ int main(int argc, char* argv[]) {
 	            }
 	            nk_layout_row_end(ctx);
 
-	            nk_layout_row_static(ctx, 30, 180, 1);
-	            {
-	                char cam_pos_label[64];
-	                snprintf(cam_pos_label, 64, "(%.3f,%.3f,%.3f)\0", camera.view_matrix[12], camera.view_matrix[13], camera.view_matrix[14]);
-	                nk_label(ctx, cam_pos_label, NK_TEXT_LEFT);
-	            }
-
 	            nk_layout_row_static(ctx, 30, 200, 1);
 	            {
 	                char fps_label[64];
@@ -653,13 +657,6 @@ int main(int argc, char* argv[]) {
 					char cam_angle_label[64];
 					snprintf(cam_angle_label, 64, "yaw:%.2f,pitch:%.2f\0", camera.yaw, camera.pitch);
 					nk_label(ctx, cam_angle_label, NK_TEXT_LEFT);
-				}
-
-				nk_layout_row_static(ctx, 30, 200, 1);
-				{
-					char cam_front_label[64];
-					snprintf(cam_front_label, 64, "x:%.2f,y:%.2f,z:%.2f\0", camera.camera_front[0], camera.camera_front[1], camera.camera_front[2]);
-					nk_label(ctx, cam_front_label, NK_TEXT_LEFT);
 				}
 
 				nk_layout_row_static(ctx, 30, 200, 1);

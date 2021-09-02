@@ -3,6 +3,86 @@
 *
 */
 
+#include "shader.h"
+#include "opengl.h"
+#include "linalg.h"
+#include "util.h"
+
+struct debug_draw {
+	struct shader_t debug_shader;
+	int color_uniform_loc;
+	int mvp_uniform_loc;
+
+	float line_vert[6] = {
+		// x     y     z
+		 0.0f,  0.0f,  0.0f,
+		 0.0f,  0.0f,  0.0f,
+	};
+	buffer_t* line_vert_buf;
+	float tri_vert[9] = {
+		// x     y     z
+		 0.5f,  0.0f,  0.5f,
+		-0.5f,  0.0f,  0.5f,
+		 0.0f,  0.0f,  0.5f,
+	};
+	buffer_t* tri_vert_buf;
+	GLuint debug_VAO;
+	GLuint debug_triVAO;
+	float mvp[16];
+};
+
+void debug_draw_new(struct debug_draw* draw) {
+		char* debug_vert_shader = ""
+			"layout (location = 0) in vec3 aPosition; \n"
+			"out vec3 vertex_color;\n"
+			"uniform mat4 mvp;\n"
+			"void main() {\n"
+			"	gl_Position = mvp * vec4(aPosition,1.0);\n"
+			"}\n\0";
+
+		char* debug_frag_shader = ""
+			"out vec4 FragColor;\n"
+			"uniform vec3 color;\n"
+			"void main() {\n"
+			"	FragColor = vec4(color,1.0);\n"
+			"}\n\0";
+
+		shader_graphics_new(
+			&draw->debug_shader,
+			debug_vert_shader, 143,
+			debug_frag_shader, 88
+		);
+
+		mat4_identity(draw->mvp);
+
+		gl_use_program(draw->debug_shader.program);
+		draw->color_uniform_loc = glGetUniformLocation(draw->debug_shader.program, "color");
+		glUniform3f(draw->color_uniform_loc, 1., .0, .0);
+		draw->mvp_uniform_loc = glGetUniformLocation(draw->debug_shader.program, "mvp");
+
+
+		glGenVertexArrays(1, &draw->debug_VAO);
+		glBindVertexArray(draw->debug_VAO);
+
+		draw->line_vert_buf = buffer_new(sizeof(draw->line_vert), draw->line_vert, BUFFER_VERTEX, USAGE_DYNAMIC, false);
+		gl_gpu_bind_buffer(draw->line_vert_buf->type, draw->line_vert_buf->id);
+
+		// vertex position attribute
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+		glBindVertexArray(0);
+
+		glGenVertexArrays(1, &draw->debug_triVAO);
+		glBindVertexArray(draw->debug_triVAO);
+
+		draw->tri_vert_buf = buffer_new(sizeof(draw->tri_vert), draw->tri_vert, BUFFER_VERTEX, USAGE_DYNAMIC, false);
+		gl_gpu_bind_buffer(draw->tri_vert_buf->type, draw->tri_vert_buf->id);
+
+		// vertex position attribute
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+		glBindVertexArray(0);
+}
 
 
 // Bullet Physics Debug interface
@@ -14,10 +94,6 @@
 #pragma once
 
 #include "btIDebugDraw.h"
-#include "shader.h"
-#include "opengl.h"
-#include "linalg.h"
-#include "util.h"
 
 class btDebugDraw : public btIDebugDraw {
 	int m_debugMode;

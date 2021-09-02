@@ -1,3 +1,10 @@
+/* 
+opengl gpu calls
+and a gpu_state struct
+which manages the global
+state of the gpu 
+*/
+
 #ifndef OPENGL_H
 #define OPENGL_H
 
@@ -11,11 +18,6 @@
 
 #include "util.h"
 #include "glad.h"
-
-/* opengl gpu calls
-and a gpu_state struct
-which manages the global
-state of the gpu */
 
 static struct {
 	uint32_t program;

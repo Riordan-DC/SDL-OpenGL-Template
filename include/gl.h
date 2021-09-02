@@ -1,19 +1,11 @@
-#ifndef GL_H
-#define GL_H
-
-#include "opengl.h"
-#include "shader.h"
-#include "mesh.h"
-#include "linalg.h"
-
 /* GL (graphics lib) manages all
-graphics operations. data produces
+graphics operations. Game data produces
 draw call which combined with
 a viewport renders a frame. A viewport
 managers render state. render data
 describes input for a single material.
 rendering is a multistep process
-where objects are 
+where objects are
 
 TODO: functions for adding:
 - adding a sky
@@ -27,7 +19,16 @@ TODO: functions for adding:
 
 - building a default viewport */
 
-// Window
+
+#ifndef GL_H
+#define GL_H
+
+#include "opengl.h"
+#include "shader.h"
+#include "mesh.h"
+#include "linalg.h"
+
+// Window creation and managment
 SDL_Window* SDL_Window_new(int screen_width, int screen_height, char* window_name, int SDL_Window_flags) {
 	int error = SDL_Init(SDL_INIT_VIDEO); //SDL_InitSubSystem(SDL_INIT_VIDEO);
 	
@@ -113,61 +114,76 @@ enum camera_type {
 };
 
 struct camera_t {
-	float view_matrix[16];
-	float projection_matrix[16];
-
 	float fov;
-	float aspect;
 	float near;
 	float far;
-	float camera_pos[4];
-	float camera_front[4];
-	float camera_up[4];
-	float camera_right[4];
+	float position[4];
+
 	float yaw;
 	float pitch;
+	float roll;
 	enum camera_type type;
 };
 
-int camera_new(camera_t *camera, enum camera_type type, float fov, float aspect, float near, float far) {
+mat4 camera_view(mat4 view_matrix, camera_t *camera) {
+	float front[4] = { .0, .0, .0, 1. };
+	front[0] = cos(RAD(camera->yaw)) * cos(RAD(camera->pitch));
+	front[1] = sin(RAD(camera->pitch));
+	front[2] = sin(RAD(camera->yaw)) * cos(RAD(camera->pitch));
+	vec3_normalize(front);
+
+	float world_up[4] = { .0, 1., .0, 1. };
+	float right[4] = { .0, .0, .0, 1. };
+	vec3_init(right, front);
+	vec3_cross(right, world_up);
+	vec3_normalize(right);
+
+	float up[4] = { .0, .0, .0, 1. };
+	vec3_init(up, right);
+	vec3_cross(up, front);
+	vec3_normalize(up);
+
+	view_matrix[12] = camera->position[0];
+	view_matrix[13] = camera->position[1];
+	view_matrix[14] = camera->position[2];
+
+	float look_dir[4] = { .0, .0, .0, 1. };
+	vec3_init(look_dir, camera->position);
+	vec3_add(look_dir, front);
+
+	mat4_lookAt(view_matrix, camera->position, look_dir, up);
+
+	return view_matrix;
+}
+
+mat4 camera_projection(mat4 projection_matrix, camera_t* camera, int width, int height) {
+	if (camera->type == PERSPECTIVE) {
+		mat4_perspective(projection_matrix, camera->near, camera->far, RAD(camera->fov), (float)width / (float)height);
+	}
+	else {
+		roy_assert(0, "Not implimented orthographic camera");
+		mat4_orthographic(projection_matrix, -1.0, 1.0, 1.0, -1.0, .01f, camera->far);
+	}
+	return projection_matrix;
+}
+
+void camera_new(camera_t *camera, enum camera_type type, float fov, float near, float far) {
 	// fov: field of view, in degrees
-	// aspect: width / height of viewport
 	camera->type = type;
 	camera->fov = fov;
-	camera->aspect = aspect;
 	camera->near = near;
 	camera->far = far;
-	if (type == PERSPECTIVE) {
-		mat4_perspective(camera->projection_matrix, camera->near, camera->far, RAD(camera->fov), camera->aspect);
-	} else {
-		mat4_orthographic(camera->projection_matrix, -1.0, 1.0, 1.0, -1.0, .01f, camera->far);
-	}
-    mat4_identity(camera->view_matrix);
-    camera->camera_front[0] = .0;
-    camera->camera_front[1] = .0;
-	camera->camera_front[2] = -1.;
-	camera->camera_front[3] = 1.; // w
 
-    camera->camera_up[0] = .0;
-    camera->camera_up[1] =  1.;
-    camera->camera_up[2] = .0;
-	camera->camera_up[3] = 1.; // w
-
-	camera->camera_right[0] = .0;
-	camera->camera_right[1] = .0;
-	camera->camera_right[2] = .0;
-	camera->camera_right[3] = 1.; // w
-
-	camera->camera_pos[0] = .0;
-	camera->camera_pos[1] = .0;
-	camera->camera_pos[2] = .0;
-	camera->camera_pos[3] = 1.; // w
+	camera->position[0] = .0;
+	camera->position[1] = .0;
+	camera->position[2] = .0;
+	camera->position[3] = 1.; // w
 
     camera->yaw = -90.;
     camera->pitch = .0;
-    return 0;
+	camera->roll = .0;
 }
-
+/*
 void camera_update_matrices(camera_t* camera) {
 	float front[4] = { .0, .0, .0, 1. };
 	front[0] = cos(RAD(camera->yaw)) * cos(RAD(camera->pitch));
@@ -189,9 +205,9 @@ void camera_update_matrices(camera_t* camera) {
 	vec3_normalize(up);
 	vec3_init(camera->camera_up, up);
 
-	camera->view_matrix[12] = camera->camera_pos[0];
-	camera->view_matrix[13] = camera->camera_pos[1];
-	camera->view_matrix[14] = camera->camera_pos[2];
+	camera->view_matrix[12] = camera->position[0];
+	camera->view_matrix[13] = camera->position[1];
+	camera->view_matrix[14] = camera->position[2];
 
 	if (camera->type == PERSPECTIVE) {
 		mat4_perspective(camera->projection_matrix, camera->near, camera->far, RAD(camera->fov), camera->aspect);
@@ -203,29 +219,34 @@ void camera_update_matrices(camera_t* camera) {
 
 void camera_look_at(camera_t *camera, vec3 pos) {
 	if (camera->type == PERSPECTIVE) {
-		mat4_lookAt(camera->view_matrix, camera->camera_pos, pos, camera->camera_up);
+		mat4_lookAt(camera->view_matrix, camera->position, pos, camera->camera_up);
 	} else {
 		roy_log(LOG_WARN, "GL", "camera Look At is unimplimented for ORTHOGRAPHIC type cameras");
 	}
 }
+*/
+/*
+void camera_screen_space_position(int* screen_x, int* screen_y, const vec3 world_position,
+	const camera_t *camera, int width, int height) {
+	VMatrix view, proj, viewproj;
+	ComputeViewMatrix(&view, camera);
+	ComputeProjectionMatrix(&proj, camera, width, height);
+	MatrixMultiply(proj, view, viewproj);
 
-inline void camera_set_pos(camera_t* camera, vec3 pos) {
-	camera->camera_pos[0] = pos[0];
-	camera->camera_pos[1] = pos[1];
-	camera->camera_pos[2] = pos[2];
-}
+	Vector vecScreenPos;
+	Vector3DMultiplyPositionProjective(viewproj, vecWorldPosition, vecScreenPos);
 
-inline void camera_move(camera_t* camera, vec3 move) {
-	vec3_add(camera->camera_pos, move);
-}
+	pScreenPosition->x = (vecScreenPos.x + 1.0f) * width / 2.0f;
+	pScreenPosition->y = (-vecScreenPos.y + 1.0f) * height / 2.0f;
+}*/
 
-// draw_call
+// draw call format
 struct draw_call_t {
 
 };
 
 // render target
-struct viewport_t {
+struct render_target_t {
 	// sky gradient
 	// buffers: bloom
 	// camera
