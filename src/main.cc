@@ -171,20 +171,8 @@ void camera_handle_input(camera_t* camera, double dt) {
 	const Uint8 *state = SDL_GetKeyboardState(NULL);
 	float speed = 1.0 * (float)dt;
 	float pos[4] = {.0, .0, .0, 1.};
-	float front[4] = { .0, .0, .0, 1. };
-	front[0] = cos(RAD(camera->yaw)) * cos(RAD(camera->pitch));
-	front[1] = sin(RAD(camera->pitch));
-	front[2] = sin(RAD(camera->yaw)) * cos(RAD(camera->pitch));
-	vec3_normalize(front);
-	float world_up[4] = { .0, 1., .0, 1. };
-	float right[4] = { .0, .0, .0, 1. };
-	vec3_init(right, front);
-	vec3_cross(right, world_up);
-	vec3_normalize(right);
-	float up[4] = { .0, .0, .0, 1. };
-	vec3_init(up, right);
-	vec3_cross(up, front);
-	vec3_normalize(up);
+	float front[4], right[4], up[4];
+	camera_basis(camera, front, right, up);
 	if (state[SDL_SCANCODE_W]) { // forwards
 		float move_dir[4] = { .0, .0, .0, 1. };
 		vec3_init(move_dir, front);
@@ -288,9 +276,6 @@ int main(int argc, char* argv[]) {
 	btRigidBody* body = new btRigidBody(rb_info);
 	dynamicsWorld->addRigidBody(body);
 
-	btVector3 dis = body->getCenterOfMassPosition();
-	roy_log(LOG_INFO, "BULLET", "COM Terrain %f,%f,%f", (float)dis.x(), (float)dis.y(), (float)dis.z());
-
 	// Load shaders
 	FILE* vertex_shader_file = fopen("shader/normal.vert", "rb");
 	fseek(vertex_shader_file, 0, SEEK_END);
@@ -356,6 +341,18 @@ int main(int argc, char* argv[]) {
 	GLuint VAO;
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
+	// vertex position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	glBindVertexArray(0);
+
+	mesh_t sphere;
+	mesh_sphere(&sphere, 16, 16, 2.0, 1.0, false);
+	buffer_t *sphere_verts = buffer_new(sphere.positions.length*sizeof(float), sphere.positions.data, BUFFER_VERTEX, USAGE_STATIC, false);
+	buffer_t *sphere_indices = buffer_new(sphere.indices.length*sizeof(unsigned int), sphere.indices.data, BUFFER_INDEX, USAGE_STATIC, false);
+	GLuint sphereVAO;
+	glGenVertexArrays(1, &sphereVAO);
+	glBindVertexArray(sphereVAO);
 	// vertex position attribute
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
@@ -605,6 +602,36 @@ int main(int argc, char* argv[]) {
 			glBindVertexArray(0);
 			gl_use_program(0);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+			{
+				gl_use_program(normal_shader.program);
+				float mvp[16], projection[16], view[16];
+				mat4_identity(mvp);
+				mat4_mul(mvp, camera_projection(projection, &camera, width, height));
+				mat4_mul(mvp, camera_view(view, &camera));
+				mat4_mul(mvp, model);
+				shader_set_uniform(&normal_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
+				uint64_t index = map_get(&normal_shader.uniform_map, hash64("MVP", strlen("MVP")));
+				roy_assert(index != MAP_NIL, "Cannot find shader uniform!");
+				struct uniform_t uniform = normal_shader.uniforms.data[index];
+				//shader_set_uniform(normal_shader, "Model", void* data, uint32_t start, uint32_t count, uint32_t size);
+				glUniformMatrix4fv(uniform.location, uniform.count, GL_FALSE, (GLfloat*)uniform.value.data);
+
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+				glDisable(GL_CULL_FACE);
+				glBindVertexArray(sphereVAO);
+				gl_gpu_bind_buffer(sphere_verts->type, sphere_verts->id);
+				gl_gpu_bind_buffer(sphere_indices->type, sphere_indices->id);
+				glDrawElements(
+					GL_TRIANGLES,
+					sphere_indices->size,
+					GL_UNSIGNED_INT, // WARNING: This may be different depending on mesh size and will need to be passed to the Mesh at load
+					(void*)0); // offset
+				glBindVertexArray(0);
+				gl_use_program(0);
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			}
+
 			
 			// Debug physics
 			if (debug_physics) {

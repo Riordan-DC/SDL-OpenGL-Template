@@ -125,23 +125,25 @@ struct camera_t {
 	enum camera_type type;
 };
 
-mat4 camera_view(mat4 view_matrix, camera_t *camera) {
-	float front[4] = { .0, .0, .0, 1. };
+void camera_basis(camera_t* camera, vec3 front, vec3 right, vec3 up) {
 	front[0] = cos(RAD(camera->yaw)) * cos(RAD(camera->pitch));
 	front[1] = sin(RAD(camera->pitch));
 	front[2] = sin(RAD(camera->yaw)) * cos(RAD(camera->pitch));
 	vec3_normalize(front);
 
 	float world_up[4] = { .0, 1., .0, 1. };
-	float right[4] = { .0, .0, .0, 1. };
 	vec3_init(right, front);
 	vec3_cross(right, world_up);
 	vec3_normalize(right);
 
-	float up[4] = { .0, .0, .0, 1. };
 	vec3_init(up, right);
 	vec3_cross(up, front);
 	vec3_normalize(up);
+}
+
+mat4 camera_view(mat4 view_matrix, camera_t *camera) {
+	float front[4], right[4], up[4];
+	camera_basis(camera, front, right, up);
 
 	view_matrix[12] = camera->position[0];
 	view_matrix[13] = camera->position[1];
@@ -167,6 +169,7 @@ mat4 camera_projection(mat4 projection_matrix, camera_t* camera, int width, int 
 	return projection_matrix;
 }
 
+
 void camera_new(camera_t *camera, enum camera_type type, float fov, float near, float far) {
 	// fov: field of view, in degrees
 	camera->type = type;
@@ -183,48 +186,18 @@ void camera_new(camera_t *camera, enum camera_type type, float fov, float near, 
     camera->pitch = .0;
 	camera->roll = .0;
 }
-/*
-void camera_update_matrices(camera_t* camera) {
-	float front[4] = { .0, .0, .0, 1. };
-	front[0] = cos(RAD(camera->yaw)) * cos(RAD(camera->pitch));
-	front[1] = sin(RAD(camera->pitch));
-	front[2] = sin(RAD(camera->yaw)) * cos(RAD(camera->pitch));
-	vec3_normalize(front);
-	vec3_init(camera->camera_front, front);
 
-	float world_up[4] = { .0, 1., .0, 1. };
-	float right[4] = { .0, .0, .0, 1. };
-	vec3_init(right, camera->camera_front);
-	vec3_cross(right, world_up);
-	vec3_normalize(right);
-	vec3_init(camera->camera_right, right);
-
-	float up[4] = { .0, .0, .0, 1. };
-	vec3_init(up, camera->camera_right);
-	vec3_cross(up, camera->camera_front);
-	vec3_normalize(up);
-	vec3_init(camera->camera_up, up);
-
-	camera->view_matrix[12] = camera->position[0];
-	camera->view_matrix[13] = camera->position[1];
-	camera->view_matrix[14] = camera->position[2];
-
+mat4 camera_look_at(mat4 view_matrix, camera_t *camera, vec3 pos) {
+	float front[4], right[4], up[4];
+	camera_basis(camera, front, right, up);
 	if (camera->type == PERSPECTIVE) {
-		mat4_perspective(camera->projection_matrix, camera->near, camera->far, RAD(camera->fov), camera->aspect);
-	}
-	else {
-		mat4_orthographic(camera->projection_matrix, -1.0, 1.0, 1.0, -1.0, .01f, camera->far);
-	}
-}
-
-void camera_look_at(camera_t *camera, vec3 pos) {
-	if (camera->type == PERSPECTIVE) {
-		mat4_lookAt(camera->view_matrix, camera->position, pos, camera->camera_up);
+		mat4_lookAt(view_matrix, camera->position, pos, up);
 	} else {
 		roy_log(LOG_WARN, "GL", "camera Look At is unimplimented for ORTHOGRAPHIC type cameras");
 	}
+	return view_matrix;
 }
-*/
+
 /*
 void camera_screen_space_position(int* screen_x, int* screen_y, const vec3 world_position,
 	const camera_t *camera, int width, int height) {

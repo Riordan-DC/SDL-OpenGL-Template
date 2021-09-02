@@ -24,6 +24,7 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979
 #endif
+#define TAU 2.0*M_PI
 
 #define MAX(a, b) (a > b ? a : b)
 #define MIN(a, b) (a < b ? a : b)
@@ -81,7 +82,7 @@ static inline void _arr_reserve(void** data, size_t n, size_t* capacity, size_t 
   if (*capacity == 0) *capacity = 1;
   while (*capacity < n) *capacity *= 2;
   *data = allocator(*data, *capacity * stride);
-  roy_assert(*data, "Out of memory");
+  roy_assert(*data, "Array out of memory");
 }
 
 // UTF-8

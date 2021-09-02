@@ -19,6 +19,7 @@
 
 #define CMP_EPSILON 0.00001
 
+typedef float* vec2;
 typedef float* vec3;
 typedef float* quat;
 typedef float* mat4;
