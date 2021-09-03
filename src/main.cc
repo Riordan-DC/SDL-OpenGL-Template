@@ -53,7 +53,8 @@
 #include "shader.h"
 #include "util.h"
 #include "gl.h"
-#include "editor.hpp"
+#include "editor.h"
+#include "clipmap.h"
 
 SDL_Window* window;
 SDL_GLContext* gl_context;
@@ -357,6 +358,11 @@ int main(int argc, char* argv[]) {
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	glBindVertexArray(0);
+
+
+	// Clipmap
+	struct clipmap map;
+	clipmap_new(&map, 255, 0.1f, 5, 1024);
 
 	roy_log(LOG_INFO, "GPU", "buffer memory: %d bytes", gl_gpu_state_buffer_memory());
 
