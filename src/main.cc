@@ -170,7 +170,7 @@ void camera_handle_input(camera_t* camera, double dt) {
 
 	// Movement
 	const Uint8 *state = SDL_GetKeyboardState(NULL);
-	float speed = 1.0 * (float)dt;
+	float speed = 5.0 * (float)dt;
 	float pos[4] = {.0, .0, .0, 1.};
 	float front[4], right[4], up[4];
 	camera_basis(camera, front, right, up);
@@ -278,31 +278,55 @@ int main(int argc, char* argv[]) {
 	dynamicsWorld->addRigidBody(body);
 
 	// Load shaders
-	FILE* vertex_shader_file = fopen("shader/normal.vert", "rb");
-	fseek(vertex_shader_file, 0, SEEK_END);
-	long int vertex_shader_size = ftell(vertex_shader_file);
-	fseek(vertex_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
-	char *shader_vertex_source = (char*)malloc(vertex_shader_size + 1);
-	fread(shader_vertex_source, 1, vertex_shader_size, vertex_shader_file);
-	fclose(vertex_shader_file);
-	shader_vertex_source[vertex_shader_size] = 0;
+	char* shader_vertex_source;
+	char* shader_fragment_source;
+	long int vertex_shader_size, fragment_shader_size;
+	{
+		FILE* vertex_shader_file = fopen("shader/normal.vert", "rb");
+		fseek(vertex_shader_file, 0, SEEK_END);
+		vertex_shader_size = ftell(vertex_shader_file);
+		fseek(vertex_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
+		shader_vertex_source = (char*)malloc(vertex_shader_size + 1);
+		fread(shader_vertex_source, 1, vertex_shader_size, vertex_shader_file);
+		fclose(vertex_shader_file);
+		shader_vertex_source[vertex_shader_size] = 0;
 
-	FILE* fragment_shader_file = fopen("shader/normal.frag", "rb");
-	fseek(fragment_shader_file, 0, SEEK_END);
-	long int fragment_shader_size = ftell(fragment_shader_file);
-	fseek(fragment_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
-	char *shader_fragment_source = (char*)malloc(fragment_shader_size + 1);
-	fread(shader_fragment_source, 1, fragment_shader_size, fragment_shader_file);
-	fclose(fragment_shader_file);
-	shader_fragment_source[fragment_shader_size] = 0;
+		FILE* fragment_shader_file = fopen("shader/normal.frag", "rb");
+		fseek(fragment_shader_file, 0, SEEK_END);
+		fragment_shader_size = ftell(fragment_shader_file);
+		fseek(fragment_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
+		shader_fragment_source = (char*)malloc(fragment_shader_size + 1);
+		fread(shader_fragment_source, 1, fragment_shader_size, fragment_shader_file);
+		fclose(fragment_shader_file);
+		shader_fragment_source[fragment_shader_size] = 0;
+	}
 
 	struct shader_t normal_shader;
-
 	shader_graphics_new(
-		&normal_shader, 
-		shader_vertex_source, (int)vertex_shader_size, 
+		&normal_shader,
+		shader_vertex_source, (int)vertex_shader_size,
 		shader_fragment_source, (int)fragment_shader_size
 	);
+
+	{
+		FILE* vertex_shader_file = fopen("shader/clipmap.vert", "rb");
+		fseek(vertex_shader_file, 0, SEEK_END);
+		vertex_shader_size = ftell(vertex_shader_file);
+		fseek(vertex_shader_file, 0, SEEK_SET);  /* same as rewind(f); */
+		shader_vertex_source = (char*)malloc(vertex_shader_size + 1);
+		fread(shader_vertex_source, 1, vertex_shader_size, vertex_shader_file);
+		fclose(vertex_shader_file);
+		shader_vertex_source[vertex_shader_size] = 0;
+	}
+
+	struct shader_t map_shader;
+
+	shader_graphics_new(
+		&map_shader,
+		shader_vertex_source, (int)vertex_shader_size,
+		shader_fragment_source, (int)fragment_shader_size
+	);
+
 	free(shader_vertex_source);
 	free(shader_fragment_source);
 
@@ -362,7 +386,7 @@ int main(int argc, char* argv[]) {
 
 	// Clipmap
 	struct clipmap map;
-	clipmap_new(&map, 255, 0.1f, 5, 1024);
+	clipmap_new(&map, 128, 0.1f, 3, 512);
 
 	roy_log(LOG_INFO, "GPU", "buffer memory: %d bytes", gl_gpu_state_buffer_memory());
 
@@ -637,6 +661,32 @@ int main(int argc, char* argv[]) {
 				gl_use_program(0);
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			}
+
+			// clipmap
+			{
+				gl_use_program(map_shader.program);
+				float mvp[16], projection[16], view[16];
+				mat4_identity(mvp);
+				mat4_mul(mvp, camera_projection(projection, &camera, width, height));
+				mat4_mul(mvp, camera_view(view, &camera));
+				mat4_mul(mvp, model);
+				shader_set_uniform(&map_shader, "MVP", UNIFORM_MATRIX, mvp, 0, 1, sizeof(mvp), "MVP Uniform");
+				uint64_t index = map_get(&map_shader.uniform_map, hash64("MVP", strlen("MVP")));
+				roy_assert(index != MAP_NIL, "Cannot find shader uniform!");
+				struct uniform_t uniform = map_shader.uniforms.data[index];
+				//shader_set_uniform(normal_shader, "Model", void* data, uint32_t start, uint32_t count, uint32_t size);
+				glUniformMatrix4fv(uniform.location, uniform.count, GL_FALSE, (GLfloat*)uniform.value.data);
+
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+				glDisable(GL_CULL_FACE);
+				float shift[2] = { 0.0, 0.0 };
+				cull(&map, mvp, shift);
+				render_levels(&map);
+				render_inner(&map);
+				gl_use_program(0);
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			}
+			
 
 			
 			// Debug physics

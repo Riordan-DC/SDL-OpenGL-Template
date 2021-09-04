@@ -34,7 +34,13 @@
 #define RAD(x) x * (float)M_PI / 180.0
 #define DEG(x) x * 180.0 / (float)M_PI
 
-typedef struct Color { float r, g, b, a; } Color;
+#define BIT_VALUE(x, bit) (x >> bit) & 1
+#define SET_BIT(x, bit) x |= (1 << bit)
+#define CLEAR_BIT(x, bit) x &= ~(1 << bit)
+#define TOGGLE_BIT(x, bit) x ^= (1 << bit)
+#define IS_BIT_SET(x, bit) (BIT_VALUE(x,bit) == 1)
+
+typedef struct color_t { float r, g, b, a; } color_t;
 
 #ifdef __cplusplus
 extern "C" {

@@ -233,4 +233,19 @@ struct render_target_t {
 
 // directional light
 
+/*
+// Build the framebuffer.
+GLuint framebuffer;
+glGenFramebuffers(1, &framebuffer);
+glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)framebuffer);
+glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_map, 0);
+glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
+
+GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+if (status != GL_FRAMEBUFFER_COMPLETE)
+	// Error
+
+glBindFramebuffer(GL_FRAMEBUFFER, 0);
+*/
+
 #endif GL_H

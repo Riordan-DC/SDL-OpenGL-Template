@@ -121,7 +121,7 @@ void clipmap_new(struct clipmap* cmap, int nVerts, float quad_size, int nLevels,
 			arr_append(&texcoords_inner, tex_coord, 2);
 
 			if (i > 0 && j > 0) {
-				GLuint idxs[6] = {
+				GLushort idxs[6] = {
 					vcount - 1,
 					vcount - cmap->m_N,
 					vcount - cmap->m_N - 1,
@@ -200,9 +200,6 @@ void clipmap_new(struct clipmap* cmap, int nVerts, float quad_size, int nLevels,
 		}
 		// Create degnerate triangles around the centre left
 		for (int j = 0; j < (cmap->m_N - 1) / 2 + 1; j++) {
-			//vec2 v;
-			//vec2 tc;
-
 			float vx = left * quad_size / 2;
 			float vy = ffar * quad_size / 2 + j * quad_size;
 			float u = 0.5f + left * texel_size / 2;
@@ -514,7 +511,7 @@ void clipmap_new(struct clipmap* cmap, int nVerts, float quad_size, int nLevels,
 	glEnableVertexAttribArray(0);
 	// Setup the texcoord buffer
 	glBindBuffer(GL_ARRAY_BUFFER, cmap->m_vbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices.length, texcoords.data, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * texcoords.length, texcoords.data, GL_STATIC_DRAW);
 	glVertexAttribPointer((GLuint)1, 2, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(1);
 	// Setup the index buffer
@@ -530,7 +527,7 @@ void clipmap_new(struct clipmap* cmap, int nVerts, float quad_size, int nLevels,
 	glEnableVertexAttribArray(0);
 	// Setup the texcoord buffer
 	glBindBuffer(GL_ARRAY_BUFFER, cmap->m_vbo[4]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices_inner.length, texcoords_inner.data, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * texcoords_inner.length, texcoords_inner.data, GL_STATIC_DRAW);
 	glVertexAttribPointer((GLuint)1, 2, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(1);
 	// Setup the index buffer
@@ -591,29 +588,26 @@ void create_block(struct clipmap* cmap, int vertstart, int width, int height, ar
 	arr_append(&cmap->blocks, &block, 1);
 }
 
-/*
-
 void cull(struct clipmap* cmap, mat4 mvp, vec2 shift) {
 	// initialise primcount to 1 for base indices
-	m_primcount = 1;
-	for (int i = 0; i < (int)blocks.size(); i++)
-	{
-		cull_block& block = blocks[i];
-
-		for (int j = 0; j < 4; j++)
-		{
-			vec2& v = block.bound[j];
-			vector4 frag = mvp * vector4(v.x + shift.x, -20.0f, v.y + shift.y, 1.0f);
-			vector4 NDC = frag * (1.0f / frag.w);
-
+	cmap->m_primcount = 1;
+	for (int i = 0; i < (int)cmap->blocks.length; i++) {
+		cull_block block = cmap->blocks.data[i];
+		for (int j = 0; j < 4; j++) {
+			float vx = block.bound[j][0];
+			float vy = block.bound[j][1];
+			float frag[4] = {vx + shift[0], -20.0f, vy + shift[1], 1.0f};
+			mat4_transform(mvp, frag);
+			float NDC[4];
+			vec3_init(NDC, frag);
+			vec3_scale(NDC, (1.0f / frag[3]));
 			// if screen x is neither > 1.0 nor < -1.0
 			// remember v.y is the z coordinate, the frag's x and y would still need to be divided
 			// by the w-coordinate (which is w=-z for perspective) so just mult both sides
-			if (!(NDC.z < -1.0f || NDC.z > 1.0f || NDC.x < -1.2f || NDC.x > 1.2f))
-			{
-				m_draw_count[m_primcount] = blocks[i].count;
-				m_draw_starts[m_primcount] = blocks[i].start_index;
-				m_primcount++;
+			if (!(NDC[2] < -1.0f || NDC[2] > 1.0f || NDC[0] < -1.2f || NDC[0] > 1.2f))	{
+				cmap->m_draw_count[cmap->m_primcount] = cmap->blocks.data[i].count;
+				cmap->m_draw_starts[cmap->m_primcount] = cmap->blocks.data[i].start_index;
+				cmap->m_primcount++;
 				break;
 			}
 		}
@@ -621,23 +615,23 @@ void cull(struct clipmap* cmap, mat4 mvp, vec2 shift) {
 }
 
 void render_inner(struct clipmap* cmap) {
-	glBindVertexArray(m_vao[1]);
-	glDrawElements(GL_TRIANGLES, m_nInnerIndices, GL_UNSIGNED_SHORT, 0);
+	glBindVertexArray(cmap->m_vao[1]);
+	glDrawElements(GL_TRIANGLES, cmap->m_nInnerIndices, GL_UNSIGNED_SHORT, 0);
 }
 
 void render_levels(struct clipmap* cmap) {
-	glBindVertexArray(m_vao[0]);
-	glDrawElements(GL_TRIANGLES, m_draw_count[0], GL_UNSIGNED_INT, (GLvoid*)(m_draw_starts[0]));
-	for (int i = 1; i < m_primcount; i++)
-		glDrawElements(GL_TRIANGLE_STRIP, m_draw_count[i], GL_UNSIGNED_INT, (GLvoid*)(m_draw_starts[i]));
+	glBindVertexArray(cmap->m_vao[0]);
+	glDrawElements(GL_TRIANGLES, cmap->m_draw_count[0], GL_UNSIGNED_INT, (GLvoid*)(cmap->m_draw_starts[0]));
+	for (int i = 1; i < cmap->m_primcount; i++)
+		glDrawElements(GL_TRIANGLE_STRIP, cmap->m_draw_count[i], GL_UNSIGNED_INT, (GLvoid*)(cmap->m_draw_starts[i]));
 }
 
 void clipmap_delete(struct clipmap* cmap) {
 	glDisableVertexAttribArray(0);
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(2);
-	glDeleteBuffers(6, m_vbo);
-	glDeleteVertexArrays(2, m_vao);
+	glDeleteBuffers(6, cmap->m_vbo);
+	glDeleteVertexArrays(2, cmap->m_vao);
 }
-*/
+
 #endif
