@@ -8,6 +8,21 @@
 #include "linalg.h"
 #include "util.h"
 
+char* debug_vert_shader = ""
+	"layout (location = 0) in vec3 aPosition; \n"
+	"out vec3 vertex_color;\n"
+	"uniform mat4 mvp;\n"
+	"void main() {\n"
+	"	gl_Position = mvp * vec4(aPosition,1.0);\n"
+	"}\n\0";
+
+char* debug_frag_shader = ""
+	"out vec4 FragColor;\n"
+	"uniform vec3 color;\n"
+	"void main() {\n"
+	"	FragColor = vec4(color,1.0);\n"
+	"}\n\0";
+
 struct debug_draw {
 	struct shader_t debug_shader;
 	int color_uniform_loc;
@@ -32,25 +47,10 @@ struct debug_draw {
 };
 
 void debug_draw_new(struct debug_draw* draw) {
-		char* debug_vert_shader = ""
-			"layout (location = 0) in vec3 aPosition; \n"
-			"out vec3 vertex_color;\n"
-			"uniform mat4 mvp;\n"
-			"void main() {\n"
-			"	gl_Position = mvp * vec4(aPosition,1.0);\n"
-			"}\n\0";
-
-		char* debug_frag_shader = ""
-			"out vec4 FragColor;\n"
-			"uniform vec3 color;\n"
-			"void main() {\n"
-			"	FragColor = vec4(color,1.0);\n"
-			"}\n\0";
-
 		shader_graphics_new(
 			&draw->debug_shader,
-			debug_vert_shader, 143,
-			debug_frag_shader, 88
+			debug_vert_shader, strlen(debug_vert_shader),
+			debug_frag_shader, strlen(debug_frag_shader)
 		);
 
 		mat4_identity(draw->mvp);
@@ -86,7 +86,7 @@ void debug_draw_new(struct debug_draw* draw) {
 
 
 // Bullet Physics Debug interface
-#ifdef __BULLET__
+//#ifdef __BULLET__
 
 #ifndef DEBUG_RENDERER_HPP
 #define DEBUG_RENDERER_HPP
@@ -96,7 +96,7 @@ void debug_draw_new(struct debug_draw* draw) {
 #include "btIDebugDraw.h"
 
 class btDebugDraw : public btIDebugDraw {
-	int m_debugMode;
+	int m_debugMode = 0;
 	// OpenGL 4 
 	
 	struct shader_t debug_shader;
@@ -121,26 +121,11 @@ class btDebugDraw : public btIDebugDraw {
 public:
 	float mvp[16];
 
-	btDebugDraw::btDebugDraw():m_debugMode(0) { 
-		char* debug_vert_shader = ""
-			"layout (location = 0) in vec3 aPosition; \n"
-			"out vec3 vertex_color;\n"
-			"uniform mat4 mvp;\n"
-			"void main() {\n"
-			"	gl_Position = mvp * vec4(aPosition,1.0);\n"
-			"}\n\0";
-
-		char* debug_frag_shader = ""
-			"out vec4 FragColor;\n"
-			"uniform vec3 color;\n"
-			"void main() {\n"
-			"	FragColor = vec4(color,1.0);\n"
-			"}\n\0";
-
+	btDebugDraw() { 
 		shader_graphics_new(
 			&this->debug_shader,
-			debug_vert_shader, 143,
-			debug_frag_shader, 88
+			debug_vert_shader, strlen(debug_vert_shader),
+			debug_frag_shader, strlen(debug_frag_shader)
 		);
 
 		mat4_identity(mvp);
@@ -155,7 +140,7 @@ public:
 		glBindVertexArray(this->debug_VAO);
 
 		this->line_vert_buf = buffer_new(sizeof(line_vert), line_vert, BUFFER_VERTEX, USAGE_DYNAMIC, false);
-		gl_gpu_bind_buffer(line_vert_buf->type, line_vert_buf->id);
+		//gl_gpu_bind_buffer(line_vert_buf->type, line_vert_buf->id);
 
 		// vertex position attribute
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
@@ -166,7 +151,7 @@ public:
 		glBindVertexArray(this->debug_triVAO);
 
 		this->tri_vert_buf = buffer_new(sizeof(tri_vert), tri_vert, BUFFER_VERTEX, USAGE_DYNAMIC, false);
-		gl_gpu_bind_buffer(tri_vert_buf->type, tri_vert_buf->id);
+		//gl_gpu_bind_buffer(tri_vert_buf->type, tri_vert_buf->id);
 
 		// vertex position attribute
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
@@ -177,7 +162,7 @@ public:
 
 	virtual ~btDebugDraw() {}
 
-	virtual void btDebugDraw::drawLine(const btVector3& from, const btVector3& to, const btVector3& fromColor, const btVector3& toColor) {
+	virtual void drawLine(const btVector3& from, const btVector3& to, const btVector3& fromColor, const btVector3& toColor) {
 		// update vertex positions
 		float new_line_vert[6] = {
 			 from.x(), from.y(), from.z(),
@@ -188,7 +173,7 @@ public:
 		glUniform3f(this->color_uniform_loc, (GLfloat)fromColor.x(), (GLfloat)fromColor.y(), (GLfloat)fromColor.z());
 		glUniformMatrix4fv(this->mvp_uniform_loc, 1, GL_FALSE, (GLfloat*)this->mvp);
 		glBindVertexArray(this->debug_VAO);
-		glNamedBufferSubData(line_vert_buf->id, 0, sizeof(new_line_vert), (void*)new_line_vert);
+		//glNamedBufferSubData(line_vert_buf->id, 0, sizeof(new_line_vert), (void*)new_line_vert);
 		gl_gpu_bind_buffer(line_vert_buf->type, line_vert_buf->id);
 		glDrawArrays(GL_LINES, 0, 2);
 		glBindVertexArray(0);
@@ -204,11 +189,11 @@ public:
 		*/
 	}
 
-	virtual void btDebugDraw::drawLine(const btVector3& from, const btVector3& to, const btVector3& color) {
+	virtual void drawLine(const btVector3& from, const btVector3& to, const btVector3& color) {
 		drawLine(from, to, color, color);
 	}
 
-	virtual void btDebugDraw::drawSphere(const btVector3& p, btScalar radius, const btVector3& color) {
+	virtual void drawSphere(const btVector3& p, btScalar radius, const btVector3& color) {
 		glColor4f(color.getX(), color.getY(), color.getZ(), btScalar(1.0f));
 		glPushMatrix();
 		glTranslatef(p.getX(), p.getY(), p.getZ());
@@ -243,7 +228,7 @@ public:
 		glPopMatrix();
 	}
 
-	virtual void btDebugDraw::drawTriangle(const btVector3& a, const btVector3& b, const btVector3& c, const btVector3& color, btScalar alpha) {
+	virtual void drawTriangle(const btVector3& a, const btVector3& b, const btVector3& c, const btVector3& color, btScalar alpha) {
 		// update vertex positions
 		float new_tri_vert[9] = {
 			// x     y     z
@@ -256,8 +241,8 @@ public:
 		glUniform3f(this->color_uniform_loc, (GLfloat)color.x(), (GLfloat)color.y(), (GLfloat)color.z());
 		glUniformMatrix4fv(this->mvp_uniform_loc, 1, GL_FALSE, (GLfloat*)this->mvp);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		//glNamedBufferSubData(tri_vert_buf->id, 0, sizeof(new_tri_vert), new_tri_vert);
 		glBindVertexArray(this->debug_triVAO);
-		glNamedBufferSubData(tri_vert_buf->id, 0, sizeof(new_tri_vert), (void*)new_tri_vert);
 		gl_gpu_bind_buffer(tri_vert_buf->type, tri_vert_buf->id);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 		glBindVertexArray(0);
@@ -276,7 +261,7 @@ public:
 		*/
 	}
 
-	virtual void btDebugDraw::drawContactPoint(const btVector3& pointOnB, const btVector3& normalOnB, btScalar distance, int lifeTime, const btVector3& color) {
+	virtual void drawContactPoint(const btVector3& pointOnB, const btVector3& normalOnB, btScalar distance, int lifeTime, const btVector3& color) {
 
 		{
 			btVector3 to = pointOnB + normalOnB * 1;//distance;
@@ -298,17 +283,17 @@ public:
 		}
 	}
 
-	virtual void btDebugDraw::reportErrorWarning(const char* warningString) {
+	virtual void reportErrorWarning(const char* warningString) {
 		roy_log(LOG_WARN, "BULLET", "%s", warningString);
 	}
 
 
-	virtual void btDebugDraw::draw3dText(const btVector3& location, const char* textString) {
+	virtual void draw3dText(const btVector3& location, const char* textString) {
 		glRasterPos3f(location.x(), location.y(), location.z());
 		//BMF_DrawString(BMF_GetFont(BMF_kHelvetica10),textString);
 	}
 
-	virtual void btDebugDraw::setDebugMode(int debugMode) {
+	virtual void setDebugMode(int debugMode) {
 		m_debugMode = debugMode;
 	}
 
@@ -316,7 +301,7 @@ public:
 
 };
 
-#endif
+//#endif
 #endif
 
 

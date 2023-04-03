@@ -21,7 +21,7 @@ static uint32_t prevpo2(uint32_t x) {
 static void map_rehash(map_t* map) {
   map_t old = *map;
   map->size <<= 1;
-  map->hashes = malloc(2 * map->size * sizeof(uint64_t));
+  map->hashes = (uint64_t*)malloc(2 * map->size * sizeof(uint64_t));
   map->values = map->hashes + map->size;
   roy_assert(map->size && map->hashes, "Out of memory");
   memset(map->hashes, 0xff, 2 * map->size * sizeof(uint64_t));

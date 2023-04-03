@@ -85,13 +85,13 @@ void clipmap_new(struct clipmap* cmap, int nVerts, float quad_size, int nLevels,
 
 	//Init
 
-	int i, j;
+	GLuint i, j;
 	float texel_size, left, ffar;
-	int vmarker, vcount;
+	GLuint vmarker, vcount;
 	arr_vert_t vertices, vertices_inner;
 	arr_t(float) texcoords, texcoords_inner;
 	arr_idx_t indices;
-	arr_t(GLushort)	indices_inner;
+	arr_t(GLuint)	indices_inner;
 	arr_idx_t cullable;
 
 	arr_init(&vertices, realloc);
@@ -121,7 +121,7 @@ void clipmap_new(struct clipmap* cmap, int nVerts, float quad_size, int nLevels,
 			arr_append(&texcoords_inner, tex_coord, 2);
 
 			if (i > 0 && j > 0) {
-				GLushort idxs[6] = {
+				GLuint idxs[6] = {
 					vcount - 1,
 					vcount - cmap->m_N,
 					vcount - cmap->m_N - 1,
@@ -545,8 +545,8 @@ void create_block(struct clipmap* cmap, int vertstart, int width, int height, ar
 	block.count = indices->length; // number of indices
 
 	// Form the triangles and push them onto the index list
-	for (int y = 0; y < height - 1; y++) {
-		for (int x = 0; x < width - 1; x++)	{
+	for (GLuint y = 0; y < height - 1; y++) {
+		for (GLuint x = 0; x < width - 1; x++)	{
 			if (x == 0)	{
 				GLuint idxs[2] = {
 					(y + 0) * width + (x + 0) + vertstart,

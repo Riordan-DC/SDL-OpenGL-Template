@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "SCons: run project's SConstruct file",
+            "command": "scons",
+            "args": [
+                
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                //"$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+        }
+    ]
+}

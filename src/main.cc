@@ -211,7 +211,7 @@ int main(int argc, char* argv[]) {
 	gl_context = new_SDL_GLContext(
 		window, 
 		1200, 800, 
-		4, 6, // OpenGL major, minor version (4.6) (3.1 for bullet debug)
+		3, 1, // OpenGL major, minor version (4.6) (3.1 for bullet debug)
 		4, 1);
 
 	glEnable(GL_DEPTH_TEST);
@@ -308,6 +308,7 @@ int main(int argc, char* argv[]) {
 		shader_fragment_source, (int)fragment_shader_size
 	);
 
+#if 0
 	{
 		FILE* vertex_shader_file = fopen("shader/clipmap.vert", "rb");
 		fseek(vertex_shader_file, 0, SEEK_END);
@@ -331,6 +332,7 @@ int main(int argc, char* argv[]) {
 	free(shader_fragment_source);
 
 	roy_log(LOG_INFO, "SHADER", "Shader built, program id: %d, shader type: %d", normal_shader.program, normal_shader.type);
+#endif
 
 	// triangle
 	buffer_t* triangle_verts;
@@ -662,6 +664,7 @@ int main(int argc, char* argv[]) {
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			}
 
+			/*
 			// clipmap
 			{
 				gl_use_program(map_shader.program);
@@ -686,7 +689,7 @@ int main(int argc, char* argv[]) {
 				gl_use_program(0);
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			}
-			
+			*/
 
 			
 			// Debug physics

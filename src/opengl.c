@@ -76,7 +76,7 @@ GLuint gl_link_program(GLuint program) {
   if (!is_linked) {
     int log_length;
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
-    char* log = malloc(log_length);
+    char* log = (char*)malloc(log_length);
     roy_assert(log, "Out of memory");
     glGetProgramInfoLog(program, log_length, &log_length, log);
     roy_assert(0, "Could not link shader:\n%s", log);
@@ -116,7 +116,7 @@ static GLenum convert_buffer_usage(buffer_usage usage) {
 }
 
 struct buffer_t* buffer_new(size_t size, void* data, buffer_type type, buffer_usage usage, bool readable) {
-  struct buffer_t *buffer = calloc(1, sizeof(struct buffer_t));
+  struct buffer_t *buffer = (struct buffer_t*)calloc(1, sizeof(struct buffer_t));
   roy_assert(buffer, "Out of memory");
   buffer->ref = 1;
 
@@ -136,6 +136,17 @@ struct buffer_t* buffer_new(size_t size, void* data, buffer_type type, buffer_us
       memcpy(buffer->data, data, size);
   }
   glBufferData(glType, size, data, convert_buffer_usage(usage));
+
+  // Testing
+  GLint buf_size = 0;
+  glGetBufferParameteriv(glType, GL_BUFFER_SIZE, &buf_size);
+  if(size != buf_size)
+  {
+      glDeleteBuffers(1, &buffer->id);
+      // Log the error
+      assert(false); //, "OpenGL Error: Cannot buffer data.");
+      return NULL;
+  }
   return buffer;
 }
 

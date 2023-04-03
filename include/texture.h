@@ -49,10 +49,11 @@ void image_get_rgba(struct image_t* image, unsigned int x, unsigned int y, color
 
 /* texture */
 typedef enum {
-	TEXTURE_2D,
-	TEXTURE_CUBE,
-	TEXTURE_ARRAY,
-	TEXTURE_VOLUME,
+	TEXTURE_UNKNOWN = -1,
+	TEXTURE_2D = 0,
+	TEXTURE_CUBE = 1,
+	TEXTURE_ARRAY = 2,
+	TEXTURE_VOLUME = 3,
 
 	// unused
 	TEXTURE_1D, 
@@ -73,9 +74,11 @@ typedef enum {
 	RG
 } texture_format;
 
+/*
 typedef enum {
 
 } texture_parameter;
+*/
 
 typedef struct {
 	uint32_t id;

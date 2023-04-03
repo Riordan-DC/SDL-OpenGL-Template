@@ -30,7 +30,7 @@ void mesh_sphere(struct mesh_t* mesh, unsigned int radial_segments, unsigned int
     arr_init(&mesh->normals, realloc);
     arr_init(&mesh->indices, realloc);
 
-	int i, j, prevrow, thisrow, point;
+	unsigned int i, j, prevrow, thisrow, point;
 	float x, y, z;
 
 	float scale = height * (is_hemisphere ? 1.0 : 0.5);

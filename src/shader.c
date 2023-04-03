@@ -1,7 +1,7 @@
 #include "shader.h"
 
-int shader_graphics_new(struct shader_t* shader, char* shader_vertex_source, int shader_vertex_len, char* shader_fragment_source, int shader_fragment_len) {
-	const char* version = "#version 460\n";
+enum shader_type shader_graphics_new(struct shader_t* shader, char* shader_vertex_source, int shader_vertex_len, char* shader_fragment_source, int shader_fragment_len) {
+	const char* version = "#version 410\n";
 
 	const char* compute_ext = "";
 
@@ -154,7 +154,7 @@ static texture_type get_uniform_texture_type(GLenum type) {
     case GL_IMAGE_CUBE: return TEXTURE_CUBE;
     case GL_IMAGE_2D_ARRAY: return TEXTURE_ARRAY;
 #endif
-    default: return -1;
+    default: return TEXTURE_UNKNOWN;
     }
 }
 

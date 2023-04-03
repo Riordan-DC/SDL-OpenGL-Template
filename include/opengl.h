@@ -51,7 +51,8 @@ void gl_use_program(uint32_t program);
 GLuint gl_compile_shader(GLenum type, const char** sources, int* lengths, int count);
 GLuint gl_link_program(GLuint program);
 
-void gl_allocator_set(void* alloc, void* free);
+void gl_allocator_set(void* (*alloc)(size_t size), void (*free)(void* ref));
+//void gl_allocator_set(void* alloc, void* free);
 static void* gl_allocate(size_t size);
 static void gl_free(void* ref);
 

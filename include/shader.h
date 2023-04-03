@@ -66,15 +66,15 @@ enum block_type {
 struct uniform_t {
 	char name[MAX_UNIFORM_NAME_LEN];
 	enum shader_uniform_type type;
-	uint32_t components;
-	uint32_t count;
-	uint32_t location;
-	uint32_t offset;
-	uint32_t size;
+	int32_t components;
+	int32_t count;
+	int32_t location;
+	int32_t offset;
+	int32_t size;
 	union {
 		void* data;
 		char* bytes;
-		uint32_t* ints;
+		int32_t* ints;
 		float* floats;
 		texture_t** textures;
 		//StorageImage* images;
@@ -116,8 +116,8 @@ struct shader_t {
 extern "C" {
 #endif
 
-int shader_graphics_new(struct shader_t* shader, char* shader_vertex_source, int shader_vertex_len, char* shader_fragment_source, int shader_fragment_len);
-int shader_compute_new(struct shader_t* shader, char* shader_compute_source, int shader_compute_len);
+enum shader_type shader_graphics_new(struct shader_t* shader, char* shader_vertex_source, int shader_vertex_len, char* shader_fragment_source, int shader_fragment_len);
+enum shader_type shader_compute_new(struct shader_t* shader, char* shader_compute_source, int shader_compute_len);
 //enum shader_type shader_default(shader_t* shader, default_shader_type type, char** flags, uint32_t flags_count);
 
 static void shader_setup_uniforms(struct shader_t* shader);

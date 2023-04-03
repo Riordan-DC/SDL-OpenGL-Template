@@ -464,10 +464,10 @@ if env['PLATFORM'] == 'win32':
                     buildtarget = project,
                     variant = env['target'] + "|Win32")
     
-elif env['PLATFORM'] == 'posix':
+elif env['PLATFORM'] in ['posix', 'darwin']:
     print('POSIX Build')
 
-    env['CC'] = env['CXX']
+    #env['CC'] = env['CXX']
 
     # Linux only
     if env['target'] == 'debug':
@@ -480,16 +480,20 @@ elif env['PLATFORM'] == 'posix':
 
     # Core for POSIX
     INCLUDE += [
-        '/usr/include/SDL2/'
+        #'/usr/include/SDL2/',
+        '/opt/homebrew/include/',
     ]
+    env.Append(CCFLAGS = ['-D_THREAD_SAFE']) # SDL2 include flag
     
     LIBPATH += [
-        '/usr/lib/x86_64-linux-gnu/'
+        #'/usr/lib/x86_64-linux-gnu/',
+        '/opt/homebrew/lib',
     ]
 
     LIBS += [
         'dl',
-        'GL'
+        #'GL',
+        'SDL2'
     ]
 
     CPPDEFINES += [

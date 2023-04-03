@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "configurations": [
+        {
+            "name": "Run program",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/SDL-OpenGL-Project",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            //"customLaunchSetupCommands": [
+            //  { "text": "target-run", "description": "run target", "ignoreFailures": false }
+            //],
+            "launchCompleteCommand": "exec-run",
+            "linux": {
+              "MIMode": "gdb",
+              "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "osx": {
+              "MIMode": "lldb",
+              "name": "Run program",
+              "type": "cppdbg",
+              "request": "launch",
+              "program": "${workspaceFolder}/build/bin/SDL-OpenGL-Project",
+            },
+            "windows": {
+              "MIMode": "gdb",
+              "miDebuggerPath": "C:\\MinGw\\bin\\gdb.exe"
+            }
+        }
+      ]
+
+}
+
